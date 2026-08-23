@@ -7,6 +7,10 @@ from pydantic import BaseModel, Field
 from backend import main as core
 from backend import solve_assistant as reasoning
 from backend import solver_prompt_patch as prompt_patch
+# Imported for side effects after the deep binary/audio registry has been installed
+# by the runtime. This adds Python/internal fallback analyzers to the same safe
+# allow-listed catalog consumed by the Case Director.
+from backend import fallback_analyzers as fallback_analyzers  # noqa: F401
 from backend.autopilot_engine import (
     accept_reasoning_candidate,
     case_snapshot,
@@ -127,6 +131,7 @@ def autopilot_status():
         "fallback_engine": True,
         "strategy_reset": True,
         "anti_loop_memory": True,
+        "internal_fallback_parsers": True,
         "enhanced_reasoning": bool(reasoning.OPENAI_API_KEY),
     }
 
