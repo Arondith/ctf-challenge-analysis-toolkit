@@ -15,7 +15,7 @@ from backend import main as core
 router = APIRouter()
 AI_MODEL = os.getenv("H4G_AI_MODEL", "gpt-5.6")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
-MAX_EVIDENCE_CHARS = int(os.getenv("H4G_SOLVER_MAX_EVIDENCE", "18000"))
+MAX_EVIDENCE_CHARS = int(os.getenv("H4G_SOLVER_MAX_EVIDENCE", "30000"))
 
 
 def ensure_solver_db() -> None:
@@ -89,17 +89,17 @@ def collect_evidence(root_artifact_id: str | None) -> tuple[str | None, str]:
             ids,
         ).fetchall()
         findings = conn.execute(
-            f"SELECT artifact_id, category, title, value, confidence FROM findings WHERE artifact_id IN ({marks}) ORDER BY confidence DESC LIMIT 100",
+            f"SELECT artifact_id, category, title, value, confidence FROM findings WHERE artifact_id IN ({marks}) ORDER BY confidence DESC LIMIT 140",
             ids,
         ).fetchall()
         flags = conn.execute(
-            f"SELECT artifact_id, flag, confidence, status, technique FROM flags WHERE artifact_id IN ({marks}) ORDER BY confidence DESC LIMIT 80",
+            f"SELECT artifact_id, flag, confidence, status, technique FROM flags WHERE artifact_id IN ({marks}) ORDER BY confidence DESC LIMIT 100",
             ids,
         ).fetchall()
         tool_runs = []
         try:
             tool_runs = conn.execute(
-                f"SELECT artifact_id, label, output, status FROM tool_runs WHERE artifact_id IN ({marks}) ORDER BY id DESC LIMIT 60",
+                f"SELECT artifact_id, label, output, status FROM tool_runs WHERE artifact_id IN ({marks}) ORDER BY id DESC LIMIT 100",
                 ids,
             ).fetchall()
         except Exception:
@@ -112,7 +112,7 @@ def collect_evidence(root_artifact_id: str | None) -> tuple[str | None, str]:
         )
     parts.append("\nFINDINGS")
     for r in findings:
-        value = (r["value"] or "").replace("\x00", " ")[:500]
+        value = (r["value"] or "").replace("\x00", " ")[:700]
         parts.append(f"- {r['artifact_id']} [{r['confidence']:.0%}] {r['title']}: {value}")
     parts.append("\nFLAG CANDIDATES")
     for r in flags:
@@ -122,12 +122,20 @@ def collect_evidence(root_artifact_id: str | None) -> tuple[str | None, str]:
             f"- {r['artifact_id']} [{r['confidence']:.0%}] {flag!r} | status={r['status']} | printable_ascii={printable} | {r['technique']}"
         )
     parts.append("\nTOOL OUTPUT HIGHLIGHTS")
-    interesting = re.compile(r"(?i)flag|clue|secret|password|metadata|comment|message|subject|dns|icmp|http|smtp|ftp|nfs|hid|xor|spectrogram|stux|duqu|worm")
+    interesting = re.compile(
+        r"(?i)flag|clue|secret|password|metadata|comment|message|subject|dns|icmp|http|smtp|ftp|nfs|hid|xor|"
+        r"spectrogram|stux|duqu|worm|pyinstaller|pyi-|entry point|bytecode|load_const|constant|sonar|ship|grid|ping|"
+        r"frequency|\bhz\b|\.wav|restart|sweep|success|coordinate|base64|archive|extract"
+    )
     for r in tool_runs:
         output = r["output"] or ""
         lines = [line.strip() for line in output.splitlines() if interesting.search(line)]
+        # Disassembly and extraction reports are intrinsically high-value even if
+        # a relevant constant does not match one of the keyword filters.
+        if not lines and any(x in (r["label"] or "").lower() for x in ("disassembly", "pyinstaller")):
+            lines = [line.strip() for line in output.splitlines() if line.strip()][:18]
         if lines:
-            parts.append(f"- {r['artifact_id']} {r['label']} ({r['status']}): " + " | ".join(lines[:8])[:1400])
+            parts.append(f"- {r['artifact_id']} {r['label']} ({r['status']}): " + " | ".join(lines[:18])[:2600])
     text = "\n".join(parts)
     return root_id, text[:MAX_EVIDENCE_CHARS]
 
@@ -139,17 +147,41 @@ def format_flag(answer: str, challenge_text: str) -> str:
     return f"{prefix}{{{answer}}}"
 
 
+def _is_placeholder_flag(value: str) -> bool:
+    match = re.fullmatch(r"[A-Za-z0-9_-]+\{(.*)\}", value.strip())
+    if not match:
+        return False
+    body = match.group(1).strip().lower()
+    if body in {"flag", "answer", "example", "actual_flag", "actual answer", "actual_answer", "hash", "tool name"}:
+        return True
+    if re.fullmatch(r"part\d+(?:_part\d+)+", body):
+        return True
+    if "coordinateid" in body or body.startswith("id1-"):
+        return True
+    return False
+
+
+def _unique_grid_coordinates(evidence: str) -> list[str]:
+    seen: set[str] = set()
+    coords: list[str] = []
+    for value in re.findall(r"\b[A-J](?:10|[1-9])\b", evidence, re.I):
+        item = value.upper()
+        if item not in seen:
+            seen.add(item)
+            coords.append(item)
+    return coords
+
+
 def local_reasoning(title: str, description: str, evidence: str, supplied: str | None) -> dict:
     text = f"{title}\n{description}".strip()
     low = text.lower()
+    evlow = evidence.lower()
     steps: list[str] = []
     next_actions: list[str] = []
     candidate = supplied.strip() if supplied else ""
     confidence = 0.35
 
-    # Knowledge relation, not a challenge-title lookup: Stuxnet (2010) -> Duqu (discovered later,
-    # closely related and espionage-focused). This lets clue-style malware-history prompts be solved
-    # without hardcoding a challenge answer by filename.
+    # Knowledge relation, not a challenge-title lookup: Stuxnet (2010) -> Duqu.
     if "2010" in low and "worm" in low:
         steps.append("The clue 'famous 2010 worm' strongly points to Stuxnet.")
         confidence = max(confidence, 0.72)
@@ -159,51 +191,74 @@ def local_reasoning(title: str, description: str, evidence: str, supplied: str |
             confidence = max(confidence, 0.90)
 
     if "not everything is conveyed through sound" in low or ("audio" in low and "hidden" in low):
-        steps.append("The wording says the WAV may be a carrier or clue rather than something solved by listening alone; metadata and spectrogram evidence should be checked.")
-        next_actions.extend(["Review audio metadata/comments.", "Inspect the spectrogram visually instead of treating PNG bytes as text."])
+        steps.append("The wording says the audio may be a carrier or clue rather than something solved by listening alone; signal and metadata evidence matter.")
 
     if "static" in low or "noise" in low:
         steps.append("Static/noise can be thematic misdirection; the semantic wording of the prompt may carry the decisive clue.")
 
+    if "sonar" in low and ("ship" in low or "grid" in low or "ping" in low):
+        steps.append("The challenge describes a sonar/grid problem, so the objective is to recover the complete target layout and continue to the success/flag condition, not merely identify the executable type.")
+        confidence = max(confidence, 0.55)
+        coords = _unique_grid_coordinates(evidence)
+        if len(coords) >= 5:
+            steps.append("Grid-like coordinates were recovered from analysis evidence: " + ", ".join(coords[:40]) + ".")
+            confidence = max(confidence, 0.68)
+        if "extract pyinstaller application" in evlow or "pyinstaller extraction" in evlow:
+            steps.append("The executable is a PyInstaller application and its bundled Python code/resources have been extracted for recursive analysis.")
+        elif "pyi-python-flag" in evlow or "pyrun_simplestringflags" in evlow:
+            next_actions.append("Extract the PyInstaller application and disassemble its entry-point bytecode.")
+
     if "spaces" in low or "whitespace" in low:
-        steps.append("The prompt emphasizes spaces/whitespace, so trailing spaces and tabs should be interpreted as a possible binary/steganographic channel.")
-        next_actions.append("Run the whitespace steganography analyzer on extracted text files.")
+        steps.append("The prompt emphasizes spaces/whitespace, so trailing spaces and tabs are a likely binary/steganographic channel.")
 
     if re.search(r"\b64\b", text) or "base64" in low:
         steps.append("The explicit '64' clue makes Base64 a high-priority decoding hypothesis.")
-        next_actions.append("Try Base64 on high-quality printable strings, then recursively analyze the result.")
 
     if "single xor" in low and "hid" in low:
         steps.append("The prompt explicitly calls for one XOR layer plus HID usage-table decoding.")
-        next_actions.append("Extract USB HID reports, test one-byte XOR candidates, remove repeated key events, then map usage codes to keystrokes.")
 
     if "five different protocols" in low or "part1_part2_part3_part4_part5" in low:
         steps.append("The prompt defines a multipart flag distributed across protocols, so the correct task is correlation rather than choosing one raw packet string.")
-        next_actions.append("Correlate HTTP, mail, DNS, ICMP and transferred-source evidence in part order.")
 
     if "nfs" in low and ("leak" in low or "recover" in low):
-        steps.append("NFS is explicitly identified as the transfer mechanism; reconstructing NFS file data is higher value than generic packet strings.")
-        next_actions.append("Run NFS payload reconstruction and recursively analyze recovered files.")
+        steps.append("NFS is explicitly identified as the transfer mechanism; reconstructed NFS file data is higher-value evidence than generic packet strings.")
 
     if "closest" in low and "farthest" in low and "coordinate" in low:
         steps.append("The flag is derived from computed relationships between coordinate IDs, not a literal string in the CSV.")
-        next_actions.append("Use the CSV coordinate solver and format the closest/farthest ID pairs exactly as requested.")
+
+    if "pyi-python-flag" in evlow or "pyrun_simplestringflags" in evlow:
+        steps.append("The PE contains PyInstaller/Python runtime indicators; generic PE strings alone are insufficient, so bundled Python code should be the primary reverse-engineering target.")
 
     known_flags = re.findall(r"(?:H4G|HACK4GOV|CTF|FLAG)\{[ -~]{3,200}?\}", evidence)
-    clean_flags = [x for x in known_flags if x.isascii() and x.isprintable()]
+    clean_flags = [
+        x for x in known_flags
+        if x.isascii() and x.isprintable() and not _is_placeholder_flag(x)
+    ]
     if clean_flags:
-        steps.append("The evidence contains one or more clean known-format flags; these deserve higher priority than generic prefix{...} regex matches.")
+        steps.append("The analysis evidence contains a clean, non-placeholder known-format flag; it outranks generic regex matches and indirect hypotheses.")
         if not candidate:
             candidate = clean_flags[0]
-            confidence = max(confidence, 0.84)
+            confidence = max(confidence, 0.92)
+
+    if candidate and _is_placeholder_flag(candidate):
+        candidate = ""
 
     noisy_count = len(re.findall(r"printable_ascii=False", evidence))
     if noisy_count:
-        steps.append(f"{noisy_count} stored candidates contain non-printable/non-ASCII data and should be treated as binary false positives, not real flags.")
+        steps.append(f"{noisy_count} stored candidates contain non-printable/non-ASCII data and are being treated as binary false positives.")
 
     if not steps:
-        steps.append("No decisive clue rule fired. Use the artifact findings and tool outputs to form a hypothesis, then validate against the required flag format.")
-        next_actions.extend(["Run all automatic analyses on the root artifact tree.", "Paste the complete challenge prompt; clue wording often matters for knowledge/riddle challenges."])
+        steps.append("The automatic analyzers produced evidence, but no deterministic local solver rule can yet justify a final flag.")
+
+    if not candidate:
+        if not description.strip():
+            next_actions.append("Challenge wording is unavailable; provide it if it is not recoverable from the bundled challenge metadata.")
+        if "pyi-python-flag" in evlow and "pyinstaller extraction" not in evlow:
+            next_actions.append("Extract and recursively analyze the PyInstaller application.")
+        elif "sonar" in low and "ship" in low:
+            next_actions.append("Continue from extracted program/audio evidence until the success condition reveals or constructs the flag.")
+        elif not next_actions:
+            next_actions.append("Use the highest-value unexhausted analyzer supported by the current evidence; do not rerun completed generic triage without a reason.")
 
     explanation = "\n".join(f"{i+1}. {step}" for i, step in enumerate(steps))
     return {
@@ -233,6 +288,7 @@ async def ai_reasoning(title: str, description: str, evidence: str, supplied: st
     prompt = f"""You are the Solve Assistant inside an authorized local CTF workbench.
 Produce a concise analyst-facing reasoning summary, not hidden chain-of-thought.
 Do not trust broad regex flag candidates merely because they contain braces. Reject binary/non-printable garbage.
+Never treat a stated flag-format placeholder such as H4G{{flag}} or H4G{{Answer}} as a recovered flag.
 Distinguish: (1) evidence from the artifact/tool output, (2) clues from the challenge wording, and (3) background cybersecurity/general knowledge.
 If the challenge is knowledge/riddle based, solve the clue and format the answer exactly as the stated flag format.
 If evidence is insufficient, say so and recommend the next concrete analyzer action.
@@ -269,8 +325,11 @@ Local workbench evidence:
     if not text:
         raise HTTPException(502, "AI provider returned no text output.")
     candidate_match = re.search(r"(?:H4G|HACK4GOV|CTF|FLAG)\{[ -~]{3,200}?\}", text)
+    candidate = candidate_match.group(0) if candidate_match else None
+    if candidate and _is_placeholder_flag(candidate):
+        candidate = None
     return {
-        "candidate": candidate_match.group(0) if candidate_match else None,
+        "candidate": candidate,
         "confidence": 0.0,
         "reasoning_summary": text,
         "next_actions": [],
