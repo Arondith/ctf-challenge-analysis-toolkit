@@ -15,7 +15,7 @@ from backend import workbench as wb
 BASE_CATALOG = wb.analysis_catalog
 BASE_EXECUTE = wb.execute_analysis
 
-MAX_PYI_IMPORTS = 60
+MAX_PYI_IMPORTS = 30
 MAX_PYI_IMPORT_BYTES = 32 * 1024 * 1024
 
 PYINSTALLER_MARKERS = (
@@ -74,8 +74,6 @@ async def pyinstaller_extract(conn, row, analysis_id: str, label: str):
 
     rc, process_output, status = wb.run_process(argv, source.parent, timeout=90)
 
-    # pyinstxtractor-ng normally creates <filename>_extracted next to the input.
-    # Fall back to the newest matching directory in case a version varies slightly.
     if not outdir.is_dir():
         matches = [p for p in source.parent.glob(f"{source.name}*_extracted") if p.is_dir()]
         if matches:
@@ -102,8 +100,6 @@ async def pyinstaller_extract(conn, row, analysis_id: str, label: str):
                 continue
             if size <= 0 or size > core.MAX_EXTRACTED:
                 continue
-            # Avoid filling the artifact graph with runtime DLLs/PYD files unless
-            # they are tiny; prioritize code and challenge resources.
             suffix = candidate.suffix.lower()
             if suffix in {".dll", ".pyd", ".so", ".dylib", ".a", ".lib"}:
                 continue
@@ -213,3 +209,7 @@ async def deep_binary_execute(conn, row, analysis_id: str):
 
 wb.analysis_catalog = deep_binary_catalog
 wb.execute_analysis = deep_binary_execute
+
+# Chain the audio signal extension after the deep-binary patch so WAV artifacts
+# produced or uploaded later gain automatic tone/grid decoding as well.
+from backend import audio_signal as audio_signal  # noqa: E402,F401
