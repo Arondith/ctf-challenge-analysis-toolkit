@@ -1,8 +1,71 @@
+H4G CTF Challenge Analysis Toolkit
+==================================
+
+IMPORTANT
+---------
+The full Analysis Tools list (file, strings, xxd, exiftool, binwalk,
+foremost, tshark, radare2, rabin2, readelf, objdump, nm, zsteg,
+steghide, and upx) is installed inside the Docker image.
+
+If you run the backend directly from a Windows Python virtual environment,
+most Linux forensic utilities will appear as "missing" because they are not
+installed on Windows or are not on your Windows PATH.
+
+
+RECOMMENDED: RUN WITH DOCKER DESKTOP
+------------------------------------
+
+1. Install and start Docker Desktop for Windows.
+
+2. Open PowerShell and go to the project folder:
+
+cd "C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit"
+
+3. Build the analyzer image with all CTF tools:
+
+docker compose build --no-cache
+
+4. Start the application:
+
+docker compose up
+
+5. Open this in your browser:
+
+http://127.0.0.1:8000
+
+The Analysis Tools card should now detect the installed commands.
+
+To stop the application, press:
+
+Ctrl + C
+
+Or from another PowerShell window run:
+
+docker compose down
+
+
+AFTER PULLING NEW GITHUB CHANGES
+--------------------------------
+
+When the Dockerfile changes, rebuild the image before starting it again:
+
+git pull
+docker compose down
+docker compose build --no-cache
+docker compose up
+
+
+OPTIONAL: NATIVE WINDOWS / PYTHON MODE
+--------------------------------------
+
+You can still run the web application without Docker, but the external Linux
+forensics/reverse-engineering tools may show as missing.
+
 From this folder:
 
 C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit
 
-run these commands in order:
+run:
 
 python -m venv .venv
 
@@ -10,7 +73,7 @@ Then:
 
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 
-Then install the tool requirements:
+Then install the Python requirements:
 
 .\.venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
 
@@ -18,21 +81,8 @@ Then start the server:
 
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
-When you see:
-
-Uvicorn running on http://127.0.0.1:8000
-
-open this in your browser:
+Open:
 
 http://127.0.0.1:8000
 
-You do not need Docker.
-
-After the first setup, next time you only need:
-
-cd "C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit"
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
-
-Keep that PowerShell window open while using the tool. To stop it, press:
-
-Ctrl + C
+For the complete analysis toolchain, use the Docker method above.
