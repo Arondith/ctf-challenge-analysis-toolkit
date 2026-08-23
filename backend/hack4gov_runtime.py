@@ -14,6 +14,7 @@ from backend import main as core
 # Import after hack4gov_pack so this extends the fully patched workbench catalog.
 from backend import deep_binary as deep_binary  # noqa: F401
 from backend.autonomous_solver_router import router as solve_router
+from backend.autopilot_router import router as autopilot_router
 
 
 def full_tshark_fields() -> set[str]:
@@ -126,11 +127,17 @@ prune_binary_flag_noise()
 
 
 app = FastAPI(
-    title="H4G CTF Workbench - Hack4Gov Runtime",
-    version="0.7.0",
-    description="Runtime wrapper for the challenge-pack-aware Hack4Gov CTF workbench.",
+    title="CTF AUTOPILOT",
+    version="1.0.0",
+    description="Persistent autonomous CTF investigation engine for authorized challenge artifacts and labs.",
 )
+app.include_router(autopilot_router)
 app.include_router(solve_router)
+
+
+@app.get("/")
+def autopilot_home():
+    return FileResponse(core.ROOT / "frontend" / "autopilot.html")
 
 
 @app.get("/api/h4g/coverage")
@@ -139,19 +146,22 @@ def runtime_coverage():
     features = list(base.get("features", []))
     features.extend(
         [
-            "Solve Assistant with saved how-it-was-solved reports",
-            "bounded autonomous analyzer execution across the challenge artifact tree",
+            "CTF Autopilot persistent case director with no normal FAILED case state",
+            "fallback engine with failure classification and automatic alternate-path selection",
+            "anti-loop action signatures, dead-end memory, stagnation detection and strategy resets",
+            "multi-stage escalation from fast triage through final deep investigation",
+            "automatic reasoning correlation and independent high-confidence flag acceptance",
             "automatic PyInstaller extraction and cross-version Python bytecode disassembly",
-            "enhanced solve-first reasoning with backend-only configuration",
-            "strict printable flag filtering and legacy false-positive cleanup",
+            "strict printable flag filtering and placeholder rejection",
+            "legacy Solve Assistant and technical Workbench retained as secondary views",
         ]
     )
-    return {**base, "version": "0.7.0", "features": features}
+    return {**base, "version": "1.0.0", "features": features}
 
 
 @app.get("/workbench", response_class=HTMLResponse)
 def expanded_workbench():
-    """Serve the existing workbench with a larger challenge-tree budget."""
+    """Serve the technical workbench as an advanced secondary view."""
     path = core.ROOT / "frontend" / "workbench.html"
     html = path.read_text(encoding="utf-8")
     html = html.replace("while(pass<5&&total<60)", "while(pass<8&&total<250)")
@@ -159,6 +169,7 @@ def expanded_workbench():
 
     needle = '<button id="newChallenge" class="danger">New Challenge</button>'
     replacement = (
+        '<a href="/autopilot"><button class="primary">CTF Autopilot</button></a>'
         '<a href="/challenge-library"><button>Challenge Library</button></a>'
         '<a href="/solve-assistant"><button>Solve Assistant</button></a>'
         '<a href="/case-search"><button>Case Search</button></a>'
@@ -280,6 +291,6 @@ def case_search(q: str, root_artifact: str | None = None):
     }
 
 
-# All other routes come from the Hack4Gov pack, which in turn mounts the
-# expanded challenge pack, recovery layer, and original workbench APIs.
+# All remaining legacy routes come from the Hack4Gov pack, which in turn mounts
+# the expanded challenge pack, recovery layer, workbench APIs and web lab.
 app.mount("/", pack.app)
