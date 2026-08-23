@@ -5,4 +5,5 @@ PyYAML>=6.0
 pytest>=8.0
 httpx>=0.27
 Pillow>=11.0
+numpy>=2.0
 pyinstxtractor-ng>=2025.1.6
