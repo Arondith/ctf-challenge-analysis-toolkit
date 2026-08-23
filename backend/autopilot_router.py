@@ -60,6 +60,22 @@ async def _read_upload(upload: UploadFile) -> bytes:
     return bytes(data)
 
 
+async def _load_files(files: list[UploadFile]) -> tuple[list[tuple[str, bytes]], int]:
+    if not files:
+        raise HTTPException(400, "No challenge files supplied.")
+    if len(files) > MAX_BUNDLE_FILES:
+        raise HTTPException(413, f"Challenge bundle exceeds {MAX_BUNDLE_FILES} files.")
+    loaded: list[tuple[str, bytes]] = []
+    total = 0
+    for upload in files:
+        data = await _read_upload(upload)
+        total += len(data)
+        if total > MAX_BUNDLE_BYTES:
+            raise HTTPException(413, "Challenge bundle exceeds the configured total upload limit.")
+        loaded.append((upload.filename or "artifact.bin", data))
+    return loaded, total
+
+
 async def _reason_about_case(snapshot: dict, mode: str) -> dict:
     _, evidence = reasoning.collect_evidence(snapshot["root_artifact_id"])
     timeline = "\n".join(
@@ -152,25 +168,14 @@ def autopilot_status():
         "anti_loop_memory": True,
         "internal_fallback_parsers": True,
         "multi_file_cases": True,
+        "resumable_cases": True,
         "enhanced_reasoning": bool(reasoning.OPENAI_API_KEY),
     }
 
 
 @router.post("/api/autopilot/upload")
 async def upload_bundle(files: list[UploadFile] = File(...)):
-    if not files:
-        raise HTTPException(400, "No challenge files supplied.")
-    if len(files) > MAX_BUNDLE_FILES:
-        raise HTTPException(413, f"Challenge bundle exceeds {MAX_BUNDLE_FILES} files.")
-
-    loaded: list[tuple[str, bytes]] = []
-    total = 0
-    for upload in files:
-        data = await _read_upload(upload)
-        total += len(data)
-        if total > MAX_BUNDLE_BYTES:
-            raise HTTPException(413, "Challenge bundle exceeds the configured total upload limit.")
-        loaded.append((upload.filename or "artifact.bin", data))
+    loaded, total = await _load_files(files)
 
     with core.db() as conn:
         pipeline = core.Pipeline(conn)
@@ -207,6 +212,48 @@ async def upload_bundle(files: list[UploadFile] = File(...)):
     await core.hub.broadcast({"event": "autopilot-upload", "artifact_id": root_id})
     return {
         "root_artifact_id": root_id,
+        "artifacts": imported,
+        "files": len(loaded),
+        "total_bytes": total,
+    }
+
+
+@router.post("/api/autopilot/cases/{case_id}/evidence")
+async def add_case_evidence(case_id: int, files: list[UploadFile] = File(...)):
+    loaded, total = await _load_files(files)
+    with core.db() as conn:
+        case = conn.execute("SELECT * FROM autopilot_cases WHERE id=?", (case_id,)).fetchone()
+        if not case:
+            raise HTTPException(404, "Autopilot case not found.")
+        pipeline = core.Pipeline(conn)
+        imported = []
+        for name, data in loaded:
+            child = pipeline.process(
+                data,
+                core.safe_filename(name),
+                parent=case["root_artifact_id"],
+                origin="upload",
+                technique=f"Additional case evidence: {name}",
+                depth=1,
+            )
+            imported.append(child)
+        conn.execute(
+            """
+            UPDATE autopilot_cases
+            SET state='INVESTIGATING',blocker=NULL,stagnation=0,updated_at=?
+            WHERE id=?
+            """,
+            (core.now(), case_id),
+        )
+        conn.execute(
+            "INSERT INTO autopilot_timeline(case_id,level,message,created_at) VALUES(?,?,?,?)",
+            (case_id, "adapt", f"New evidence added ({len(imported)} file(s)); reopening the persistent investigation.", core.now()),
+        )
+        conn.commit()
+
+    await core.hub.broadcast({"event": "autopilot-new-evidence", "artifact_id": case["root_artifact_id"]})
+    return {
+        "case": case_snapshot(case_id),
         "artifacts": imported,
         "files": len(loaded),
         "total_bytes": total,
