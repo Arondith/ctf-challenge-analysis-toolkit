@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H4G Solve Assistant</title>
+<style>
+:root{color-scheme:dark;--bg:#050b11;--panel:#0b1721;--border:#203746;--text:#e7f0f6;--muted:#86a0b1;--cyan:#42d4ff;--green:#3ad67d;--amber:#ffc857;--red:#ff667a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 18% 0,#12354d 0,transparent 34rem),var(--bg);color:var(--text);font:15px Inter,Segoe UI,Arial,sans-serif;min-height:100vh}a{color:var(--cyan)}header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;align-items:center}.brand{font-weight:900;letter-spacing:.1em}.brand span{color:var(--cyan)}nav a{margin-left:14px;text-decoration:none;color:#b8ccd8}main{max-width:1180px;margin:auto;padding:32px 22px}.lead{color:#b8ccd8;line-height:1.6;max-width:880px}.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:18px}@media(max-width:850px){.grid{grid-template-columns:1fr}}.panel{border:1px solid var(--border);background:linear-gradient(180deg,#0d1d29,#08131c);border-radius:14px;padding:20px}.panel h2{margin-top:0}label{display:block;margin:14px 0 6px;color:#bdd0db;font-weight:700}input,textarea,select{width:100%;background:#050e15;color:var(--text);border:1px solid #294354;border-radius:9px;padding:11px;font:inherit}textarea{min-height:190px;resize:vertical}.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1}button{border:1px solid #31617a;background:#0d3041;color:#eaffff;border-radius:9px;padding:11px 15px;font-weight:800;cursor:pointer}button.primary{background:#0b5d78;border-color:#1686a9}button:hover{filter:brightness(1.12)}.status{padding:10px 12px;border-radius:9px;background:#07131c;border:1px solid var(--border);color:var(--muted);margin-bottom:14px}.ok{color:var(--green)}.warn{color:var(--amber)}.answer{font-size:22px;font-weight:900;color:var(--green);word-break:break-word}.confidence{color:var(--muted);margin:7px 0 18px}.reasoning{white-space:pre-wrap;line-height:1.65;background:#061018;border:1px solid var(--border);padding:15px;border-radius:10px;min-height:180px}.actions li{margin:8px 0;color:#c8d7df}.small{font-size:12px;color:var(--muted);line-height:1.5}.recent{margin-top:18px}.session{padding:12px;border-top:1px solid var(--border)}.session:first-child{border-top:0}.pill{display:inline-block;padding:3px 7px;border-radius:12px;background:#17384a;color:#c8f1ff;font-size:11px;margin-left:6px}code{background:#061018;border:1px solid var(--border);border-radius:5px;padding:2px 5px;color:#d9f7ff}
+</style>
+</head>
+<body>
+<header><div class="brand"><span>H4G</span> // SOLVE ASSISTANT</div><nav><a href="/">Home</a><a href="/workbench">Workbench</a><a href="/challenge-library">Library</a><a href="/case-search">Case Search</a></nav></header>
+<main>
+<h1>Explain the solve, not just the flag</h1>
+<p class="lead">Paste the challenge wording and optionally select the current root artifact. Local mode correlates clue wording with workbench evidence and stays inside Docker. AI mode can reason over the same bounded evidence when an API key is configured. The report is saved so you can revisit <b>how</b> the answer was reached.</p>
+<div class="grid">
+<section class="panel">
+<h2>Challenge Context</h2>
+<div id="aiStatus" class="status">Checking solver status…</div>
+<label for="title">Challenge title</label><input id="title" placeholder="e.g. Did you hear that?">
+<label for="description">Challenge prompt / clue</label><textarea id="description" placeholder="Paste the challenge description and flag format here. The wording matters for riddle, OSINT, malware-history, and knowledge-based challenges."></textarea>
+<div class="row"><div><label for="root">Root artifact</label><select id="root"><option value="">Latest uploaded root artifact</option></select></div><div><label for="candidate">Candidate to verify (optional)</label><input id="candidate" placeholder="H4G{...}"></div></div>
+<label for="mode">Solver mode</label><select id="mode"><option value="auto">Auto — AI if configured, otherwise local</option><option value="local">Local reasoning only</option><option value="ai">AI reasoning</option></select>
+<div class="row" style="margin-top:16px"><button class="primary" id="solve">Analyze & Explain</button><button id="example">Load clue-style example</button></div>
+<p class="small">AI mode never needs your API key in the browser. The backend reads <code>OPENAI_API_KEY</code>. Local mode sends nothing outside the workbench.</p>
+</section>
+<section class="panel">
+<h2>Solve Report</h2>
+<div id="candidateOut" class="answer">No answer yet.</div><div id="confidence" class="confidence"></div>
+<div id="reasoning" class="reasoning">Run the solver to get a concise clue → interpretation → evidence → candidate explanation.</div>
+<h3>Next validation</h3><ul id="actions" class="actions"></ul>
+<details><summary>Evidence preview</summary><pre id="evidence" class="reasoning"></pre></details>
+</section>
+</div>
+<section class="panel recent"><h2>Recent Solve Reports</h2><div id="recent">No saved reports yet.</div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+async function jfetch(url,opt){const r=await fetch(url,opt);let x;try{x=await r.json()}catch{x={detail:await r.text()}}if(!r.ok)throw new Error(x.detail||('HTTP '+r.status));return x}
+async function loadStatus(){try{const x=await jfetch('/api/h4g/solve/status');$('aiStatus').innerHTML=`<span class="ok">✓ Local reasoning ready</span> · ${x.ai_available?'<span class="ok">AI ready: '+x.ai_model+'</span>':'<span class="warn">AI not configured</span>'}<br><span class="small">${x.privacy_note}</span>`}catch(e){$('aiStatus').textContent=e.message}}
+async function loadArtifacts(){try{const xs=await jfetch('/api/artifacts');const roots=xs.filter(x=>!x.parent_id&&x.origin!=='demo').reverse();for(const x of roots){const o=document.createElement('option');o.value=x.id;o.textContent=`${x.id} — ${x.filename}`;$('root').appendChild(o)}}catch(e){console.warn(e)}}
+function render(x){$('candidateOut').textContent=x.candidate||'No defensible flag yet.';$('confidence').textContent=x.confidence?`Local confidence: ${Math.round(x.confidence*100)}% · mode: ${x.mode}`:`mode: ${x.mode}`;$('reasoning').textContent=x.reasoning_summary||'';$('actions').innerHTML='';for(const a of (x.next_actions||[])){const li=document.createElement('li');li.textContent=a;$('actions').appendChild(li)}$('evidence').textContent=x.evidence_preview||''}
+async function solve(){const body={title:$('title').value,description:$('description').value,root_artifact_id:$('root').value||null,candidate_flag:$('candidate').value||null,mode:$('mode').value};$('solve').disabled=true;$('solve').textContent='Reasoning…';try{const x=await jfetch('/api/h4g/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});render(x);await loadRecent()}catch(e){$('reasoning').textContent='Error: '+e.message}finally{$('solve').disabled=false;$('solve').textContent='Analyze & Explain'}}
+async function loadRecent(){try{const xs=await jfetch('/api/h4g/solve/recent');if(!xs.length){$('recent').textContent='No saved reports yet.';return}$('recent').innerHTML=xs.map(x=>`<div class="session"><b>${escapeHtml(x.title||'Untitled challenge')}</b><span class="pill">${escapeHtml(x.mode)}</span><br>${x.candidate?'<span class="answer" style="font-size:15px">'+escapeHtml(x.candidate)+'</span><br>':''}<span class="small">${escapeHtml(x.created_at)} · ${Math.round((x.confidence||0)*100)}% local confidence</span></div>`).join('')}catch(e){$('recent').textContent=e.message}}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+$('solve').onclick=solve;$('example').onclick=()=>{$('title').value='Did you hear that?';$('description').value="It's just static… or is it?\n\nBehind the noise, the real challenge is knowing the name of the silent strike that came after a famous 2010 worm.\n\nFlag Format: H4G{flag}";$('mode').value='local'};
+loadStatus();loadArtifacts();loadRecent();
+</script>
+</body>
+</html>
