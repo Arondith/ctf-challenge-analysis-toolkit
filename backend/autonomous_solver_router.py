@@ -7,6 +7,7 @@ from backend import main as core
 from backend import solve_assistant as base
 from backend import solver_prompt_patch as prompt_patch
 from backend.autonomous_runner import run_autonomous_analysis
+from backend.challenge_context import infer_challenge_context
 
 
 router = APIRouter()
@@ -28,6 +29,7 @@ def solve_status():
             "challenge prompt and a bounded evidence summary to the configured reasoning service."
         ),
         "autonomous_analysis": True,
+        "automatic_context": True,
     }
 
 
@@ -49,6 +51,19 @@ def resolve_root(requested: str | None) -> str | None:
 @router.post("/api/h4g/solve")
 async def solve(req: base.SolveRequest):
     root_id = resolve_root(req.root_artifact_id)
+    resolved_title, resolved_description, context_source = infer_challenge_context(
+        root_id,
+        req.title,
+        req.description,
+    )
+    effective_req = req.model_copy(
+        update={
+            "title": resolved_title,
+            "description": resolved_description,
+            "root_artifact_id": root_id,
+        }
+    )
+
     auto_report = None
 
     # Execution authority: before reasoning, run every registered allow-listed
@@ -58,18 +73,27 @@ async def solve(req: base.SolveRequest):
         auto_report = await run_autonomous_analysis(root_id)
 
     root_id, evidence = base.collect_evidence(root_id)
+    evidence = (
+        "RESOLVED CHALLENGE CONTEXT\n"
+        f"Title: {resolved_title}\n"
+        f"Context source: {context_source}\n"
+        f"Description / clue:\n{resolved_description or '(not available)'}\n\n"
+        + evidence
+    )
     if auto_report:
         evidence += (
             "\n\nAUTONOMOUS ANALYSIS SUMMARY\n"
-            f"- actions: {auto_report['actions']}\n"
+            f"- new_actions: {auto_report['actions']}\n"
+            f"- reused_completed_actions: {auto_report.get('reused_actions', 0)}\n"
+            f"- retried_actions: {auto_report.get('retried_actions', 0)}\n"
             f"- artifacts_seen: {auto_report['artifacts_seen']}\n"
             f"- passes: {auto_report['passes']}\n"
             f"- stopped_reason: {auto_report['stopped_reason']}"
         )
 
     local = base.local_reasoning(
-        req.title,
-        req.description,
+        resolved_title,
+        resolved_description,
         evidence,
         req.candidate_flag,
     )
@@ -78,8 +102,8 @@ async def solve(req: base.SolveRequest):
         result = local
     elif req.mode == "ai":
         result = await prompt_patch.solve_first_reasoning(
-            req.title,
-            req.description,
+            resolved_title,
+            resolved_description,
             evidence,
             req.candidate_flag,
         )
@@ -88,8 +112,8 @@ async def solve(req: base.SolveRequest):
         if base.OPENAI_API_KEY:
             try:
                 result = await prompt_patch.solve_first_reasoning(
-                    req.title,
-                    req.description,
+                    resolved_title,
+                    resolved_description,
                     evidence,
                     req.candidate_flag,
                 )
@@ -100,7 +124,10 @@ async def solve(req: base.SolveRequest):
             result = local
 
     result["root_artifact_id"] = root_id
-    result["evidence_preview"] = evidence[:4000]
+    result["resolved_title"] = resolved_title
+    result["resolved_description"] = resolved_description
+    result["context_source"] = context_source
+    result["evidence_preview"] = evidence[:5000]
     result["autonomous_analysis"] = auto_report
-    result["session_id"] = base.save_session(root_id, req, result)
+    result["session_id"] = base.save_session(root_id, effective_req, result)
     return result
