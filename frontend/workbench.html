@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H4G CTF Workbench</title>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#050b11;--panel:#0a151f;--panel2:#0d1c28;--border:#203746;
+  --text:#e7f0f6;--muted:#7d96a8;--cyan:#42d4ff;--green:#3ad67d;
+  --yellow:#ffd166;--orange:#ff914d;--red:#ff6262;--purple:#b39cff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 12% 0,#11324a 0,transparent 32rem),var(--bg);color:var(--text);font:14px Inter,Segoe UI,Arial,sans-serif}
+button,input,textarea,select{font:inherit}
+button{background:#102535;border:1px solid var(--border);color:var(--text);padding:8px 11px;border-radius:8px;cursor:pointer}
+button:hover{border-color:var(--cyan)} button:disabled{opacity:.45;cursor:wait}
+button.primary{background:#073c4d;border-color:#17657b;color:#d0f8ff} button.danger{border-color:#71363b;color:#ffb2b2;background:#281318}
+header{min-height:64px;padding:9px 18px;display:flex;gap:12px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;background:rgba(5,11,17,.94);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.brand{font-weight:900;letter-spacing:.11em;white-space:nowrap}.brand span{color:var(--cyan)}
+.header-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.flag-counter{color:#ff8d8d;font-weight:800;padding-right:5px}
+.layout{display:grid;grid-template-columns:285px minmax(0,1fr) 370px;min-height:calc(100vh - 64px)}
+aside,main{padding:14px}.left{border-right:1px solid var(--border)}.right{border-left:1px solid var(--border)}
+.card{background:linear-gradient(180deg,#0d1924,#08121b);border:1px solid var(--border);border-radius:12px;margin-bottom:13px;overflow:hidden}
+.card h2{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0;padding:11px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.inside{padding:12px}.empty{color:var(--muted);padding:18px;text-align:center}
+.drop{border:1px dashed #396179;padding:25px 12px;text-align:center;border-radius:10px;color:var(--muted);background:rgba(66,212,255,.035)}.drop.active{border-color:var(--cyan);background:rgba(66,212,255,.09)}
+.notice{padding:9px 11px;border-radius:8px;margin-bottom:10px;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.25);color:#ffe4a6}.notice.demo{background:rgba(179,156,255,.08);border-color:rgba(179,156,255,.3);color:#d8ceff}
+.artifact{width:100%;text-align:left;background:transparent;border-color:transparent;margin-bottom:3px;padding:7px 8px}.artifact:hover{background:#0d2634}.artifact.selected{background:#0d3040;border-color:#255a6d}.artifact small{display:block;color:var(--muted);margin-top:3px}.origin{font-size:10px;padding:2px 6px;border-radius:10px;margin-left:4px;background:#173044;color:#a9c7d8}.origin.demo{background:#30264b;color:#d7c8ff}.origin.derived{background:#213523;color:#b9e8bd}
+.meta{display:grid;grid-template-columns:120px 1fr;gap:7px 11px}.meta dt{color:var(--muted)}.meta dd{margin:0;word-break:break-all}.badge{font-size:11px;padding:3px 8px;border-radius:14px;background:#142a39;color:#b5ccdb}
+.toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:10px 0}.progress{font-size:12px;color:var(--muted)}
+.tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}.tab.active{border-color:var(--cyan);color:#c7f6ff;background:#0b3342}.panel{display:none}.panel.active{display:block}
+.finding{padding:9px 10px;border-left:3px solid #498dff;background:#0a1822;border-radius:6px;margin-bottom:7px}.finding.high{border-color:var(--orange)}.finding.medium{border-color:var(--yellow)}.finding strong{display:block}.finding small{color:var(--muted)}
+.analysis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px}.analysis-action{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:8px;border:1px solid #1c3444;border-radius:8px;background:#091722}.analysis-action small{color:var(--muted)}
+.run{border:1px solid #1d3544;border-radius:9px;margin-bottom:8px;background:#07131c}.run-head{padding:9px 10px;display:flex;justify-content:space-between;gap:8px;cursor:pointer}.run-head small{color:var(--muted)}.run pre{display:none;margin:0;border-top:1px solid #18303f;padding:10px;max-height:330px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:#040b10;color:#cfe5ef;font:12px Consolas,monospace}.run.open pre{display:block}
+.status-complete{color:var(--green)}.status-timeout{color:var(--yellow)}.status-error,.status-missing{color:var(--red)}
+pre.preview{margin:0;background:#040b10;border:1px solid #18303f;border-radius:8px;padding:10px;max-height:430px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12px Consolas,monospace;color:#d1e3ec}
+.preview-switch{display:flex;gap:6px;margin-bottom:8px}
+textarea,input[type=text]{width:100%;background:#06121b;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px;outline:none}textarea:focus,input[type=text]:focus{border-color:var(--cyan)}textarea{min-height:135px;resize:vertical;font-family:Consolas,monospace}.decoder-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.decoder-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.decoder-key{max-width:150px}
+.flag{border:1px solid rgba(255,98,98,.36);background:rgba(255,98,98,.07);border-radius:9px;padding:10px;margin-bottom:8px}.flag.confirmed{border-color:rgba(58,214,125,.5);background:rgba(58,214,125,.06)}.flag.false-positive{opacity:.45}.flag-value{font-family:Consolas,monospace;color:#ff9696;font-weight:800;word-break:break-all}.flag small{color:var(--muted)}.actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.tool{display:flex;justify-content:space-between;padding:4px 0}.ok{color:var(--green)}.no{color:#647a8b}
+.event{padding:7px 0;border-bottom:1px solid #172b38}.event small{color:var(--muted)}
+.graph{font:12px Consolas,monospace;white-space:pre-wrap;color:#acdcec;max-height:300px;overflow:auto}
+.toggle{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}.toggle input{accent-color:var(--cyan)}
+.spinner{display:inline-block;width:11px;height:11px;border:2px solid #345366;border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:1150px){.layout{grid-template-columns:260px 1fr}.right{grid-column:1/-1;border-left:0;border-top:1px solid var(--border)}}
+@media(max-width:760px){.layout{display:block}.left,.right{border:0}.decoder-grid{grid-template-columns:1fr}header{align-items:flex-start}.brand{padding-top:8px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span>H4G</span> // CTF WORKBENCH</div>
+  <div class="header-actions">
+    <span id="busyText" class="progress"></span>
+    <span id="flagCounter" class="flag-counter">🚩 0</span>
+    <button id="newChallenge" class="danger">New Challenge</button>
+    <button id="demo">Load Demo</button>
+    <button id="uploadButton" class="primary">Upload + Analyze</button>
+    <input id="file" type="file" hidden>
+  </div>
+</header>
+
+<div class="layout">
+<aside class="left">
+  <div class="card"><h2>Challenge Artifact</h2><div class="inside">
+    <div id="drop" class="drop">Drop a challenge file here<br><br><small>It stays inside the local Docker analysis workspace.</small></div>
+  </div></div>
+  <div class="card"><h2>Artifacts <span id="artifactCount"></span></h2><div id="artifactList" class="inside"></div></div>
+  <div class="card"><h2>Artifact Graph</h2><div id="graph" class="inside graph"></div></div>
+</aside>
+
+<main>
+  <div id="details" class="card"><div class="empty">Upload a challenge artifact. The workbench will triage it and run the relevant local tools.</div></div>
+
+  <div class="card">
+    <h2>Integrated Analysis <span id="analysisState"></span></h2>
+    <div class="inside">
+      <div class="toolbar">
+        <button id="analyzeThis" class="primary">Analyze This Artifact</button>
+        <button id="analyzeChallenge">Analyze Entire Challenge</button>
+        <span id="progressText" class="progress"></span>
+      </div>
+      <div id="availableAnalyses" class="analysis-grid"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Workbench</h2>
+    <div class="inside">
+      <div class="tabs">
+        <button class="tab active" data-tab="findingsPanel">Findings</button>
+        <button class="tab" data-tab="runsPanel">Tool Output</button>
+        <button class="tab" data-tab="previewPanel">Preview / Hex</button>
+        <button class="tab" data-tab="decoderPanel">Decoder Lab</button>
+      </div>
+      <div id="findingsPanel" class="panel active"><div id="findings"></div></div>
+      <div id="runsPanel" class="panel"><div id="runs"></div></div>
+      <div id="previewPanel" class="panel">
+        <div class="preview-switch">
+          <button data-preview="strings">Strings</button><button data-preview="hex">Hex</button><button data-preview="text">Text</button>
+        </div>
+        <pre id="preview" class="preview">Select an artifact.</pre>
+      </div>
+      <div id="decoderPanel" class="panel">
+        <div class="decoder-grid">
+          <div><strong>Input</strong><textarea id="decoderInput" placeholder="Paste encoded text, hex, Base64, URL encoding, or XOR data here..."></textarea></div>
+          <div><strong>Output</strong><textarea id="decoderOutput" readonly></textarea></div>
+        </div>
+        <div class="decoder-actions">
+          <button data-decode="b64d">Base64 Decode</button><button data-decode="b64e">Base64 Encode</button>
+          <button data-decode="hexd">Hex Decode</button><button data-decode="hexe">Hex Encode</button>
+          <button data-decode="url">URL Decode</button><button data-decode="rot13">ROT13</button><button data-decode="reverse">Reverse</button>
+          <input id="xorKey" class="decoder-key" type="text" placeholder="XOR key: 0x2a or 42"><button data-decode="xor">XOR</button>
+          <button data-decode="flags" class="primary">Find Flags</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<aside class="right">
+  <div class="card"><h2>Flag Candidates <label class="toggle"><input id="showDemoFlags" type="checkbox"> show demo</label></h2><div id="flags" class="inside"></div></div>
+  <div class="card"><h2>Analysis Tools</h2><div id="tools" class="inside"></div></div>
+  <div class="card"><h2>Evidence Timeline</h2><div id="events" class="inside"></div></div>
+</aside>
+</div>
+
+<script>
+let artifacts=[];
+let selected=null;
+let previewData={strings:[],hex:'',text:''};
+let previewMode='strings';
+let analyzing=false;
+
+const $=id=>document.getElementById(id);
+const escapeHtml=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+
+async function api(url,options={}){
+  const r=await fetch(url,options);
+  if(!r.ok) throw new Error(await r.text());
+  const type=r.headers.get('content-type')||'';
+  return type.includes('application/json')?r.json():r.text();
+}
+
+function depthOf(a){
+  let d=0,c=a,seen=new Set();
+  while(c&&c.parent_id&&!seen.has(c.id)){seen.add(c.id);c=artifacts.find(x=>x.id===c.parent_id);d++}
+  return d;
+}
+function rootOf(a){
+  let c=a,seen=new Set();
+  while(c&&c.parent_id&&!seen.has(c.id)){seen.add(c.id);const p=artifacts.find(x=>x.id===c.parent_id);if(!p)break;c=p}
+  return c||a;
+}
+function belongsToRoot(a,rootId){return rootOf(a)?.id===rootId}
+
+function renderArtifacts(){
+  $('artifactCount').textContent=artifacts.length?`(${artifacts.length})`:'';
+  if(!artifacts.length){$('artifactList').innerHTML='<div class="empty">No artifacts.</div>';$('graph').textContent='No artifact graph.';return}
+  $('artifactList').innerHTML=artifacts.map(a=>{
+    const d=depthOf(a);const originClass=a.origin==='demo'?'demo':a.origin==='derived'?'derived':'';
+    return `<button class="artifact ${a.id===selected?'selected':''}" data-artifact="${escapeHtml(a.id)}" style="padding-left:${8+d*14}px">
+      ${d?'└─ ':''}${escapeHtml(a.filename)} <span class="origin ${originClass}">${escapeHtml(a.origin)}</span>
+      <small>${escapeHtml(a.kind)} · ${escapeHtml(a.id)}</small></button>`
+  }).join('');
+  document.querySelectorAll('[data-artifact]').forEach(b=>b.onclick=async()=>{selected=b.dataset.artifact;renderArtifacts();await renderSelected()});
+  $('graph').textContent=artifacts.map(a=>`${'  '.repeat(depthOf(a))}${depthOf(a)?'└─ ':''}${a.filename} [${a.id}]`).join('\n');
+}
+
+async function renderSelected(){
+  const a=artifacts.find(x=>x.id===selected);
+  if(!a){$('details').innerHTML='<div class="empty">Select an artifact.</div>';return}
+  const demo=a.origin==='demo'||rootOf(a)?.origin==='demo';
+  $('details').innerHTML=`<h2>${escapeHtml(a.filename)} <span class="badge">${escapeHtml(a.kind)}</span></h2><div class="inside">
+    ${demo?'<div class="notice demo"><strong>Demo artifact.</strong> Demo flags are hidden from the real challenge flag list by default.</div>':''}
+    <dl class="meta"><dt>Artifact</dt><dd>${escapeHtml(a.id)}</dd><dt>MIME</dt><dd>${escapeHtml(a.mime)}</dd><dt>Size</dt><dd>${Number(a.size).toLocaleString()} bytes</dd>
+    <dt>Entropy</dt><dd>${a.entropy}</dd><dt>SHA-256</dt><dd>${escapeHtml(a.sha256)}</dd><dt>Origin</dt><dd>${escapeHtml(a.origin)}</dd><dt>Technique</dt><dd>${escapeHtml(a.technique)}</dd></dl>
+    <div class="toolbar"><a href="/api/artifacts/${encodeURIComponent(a.id)}/download"><button>Download Artifact</button></a></div></div>`;
+  $('findings').innerHTML=a.findings?.length?a.findings.map(f=>`<div class="finding ${escapeHtml(f.severity)}"><strong>${escapeHtml(f.title)}</strong><small>${escapeHtml(f.category)} · ${Math.round(f.confidence*100)}%</small>${f.value?`<div>${escapeHtml(f.value)}</div>`:''}</div>`).join(''):'<div class="empty">No findings.</div>';
+  await Promise.all([loadAvailable(),loadRuns(),loadPreview()]);
+}
+
+async function loadAvailable(){
+  if(!selected)return;
+  const list=await api(`/api/workbench/artifacts/${encodeURIComponent(selected)}/available`);
+  $('availableAnalyses').innerHTML=list.map(x=>`<div class="analysis-action"><div><strong>${escapeHtml(x.label)}</strong><br><small>${escapeHtml(x.tool)} ${x.auto?'· automatic':'· manual/deep'}</small></div><button data-analysis="${escapeHtml(x.id)}" ${x.available?'':'disabled'}>Run</button></div>`).join('');
+  document.querySelectorAll('[data-analysis]').forEach(b=>b.onclick=()=>runOne(b.dataset.analysis,b));
+}
+
+async function loadRuns(){
+  if(!selected)return;
+  const runs=await api(`/api/workbench/artifacts/${encodeURIComponent(selected)}/runs`);
+  $('runs').innerHTML=runs.length?runs.map(r=>`<div class="run"><div class="run-head"><div><strong>${escapeHtml(r.label)}</strong><br><small>${escapeHtml(r.command)}</small></div><span class="status-${escapeHtml(r.status)}">${escapeHtml(r.status)}</span></div><pre>${escapeHtml(r.output||'(no output)')}</pre></div>`).join(''):'<div class="empty">No external-tool runs yet.</div>';
+  document.querySelectorAll('.run-head').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('open'));
+}
+
+async function loadPreview(){
+  if(!selected)return;
+  previewData=await api(`/api/workbench/artifacts/${encodeURIComponent(selected)}/preview`);
+  renderPreview();
+}
+function renderPreview(){
+  const value=previewMode==='strings'?(previewData.strings||[]).join('\n'):previewData[previewMode]||'';
+  $('preview').textContent=value||'(no preview data)';
+}
+
+document.querySelectorAll('[data-preview]').forEach(b=>b.onclick=()=>{previewMode=b.dataset.preview;renderPreview()});
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.tab).classList.add('active')});
+
+async function renderFlags(){
+  const include=$('showDemoFlags').checked;
+  const flags=await api(`/api/workbench/flags?include_demo=${include?'true':'false'}`);
+  $('flagCounter').textContent=`🚩 ${flags.filter(f=>f.status!=='false-positive').length}`;
+  $('flags').innerHTML=flags.length?flags.map(f=>`<div class="flag ${escapeHtml(f.status)}"><div class="flag-value">${escapeHtml(f.flag)}</div><small>${escapeHtml(f.artifact_id)} · ${Math.round(f.confidence*100)}% · ${escapeHtml(f.status)}</small><div>${escapeHtml(f.technique)}</div><div class="actions"><button data-copy="${escapeHtml(f.flag)}">Copy</button><button data-flag="${f.id}" data-status="confirmed">Confirm</button><button data-flag="${f.id}" data-status="false-positive">False Positive</button></div></div>`).join(''):'<div class="empty">No real challenge flag candidates yet.</div>';
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>navigator.clipboard.writeText(b.dataset.copy));
+  document.querySelectorAll('[data-flag]').forEach(b=>b.onclick=async()=>{await api(`/api/flags/${b.dataset.flag}/${b.dataset.status}`,{method:'PATCH'});await renderFlags()});
+}
+
+async function renderEvents(){
+  const events=await api('/api/events');
+  $('events').innerHTML=events.length?events.slice(0,50).map(e=>`<div class="event"><strong>${escapeHtml(e.action)}</strong><div>${escapeHtml(e.detail)}</div><small>${new Date(e.created_at).toLocaleString()}</small></div>`).join(''):'<div class="empty">No events.</div>';
+}
+async function loadTools(){
+  const tools=await api('/api/tools');
+  $('tools').innerHTML=tools.map(t=>`<div class="tool"><span>${escapeHtml(t.name)}</span><span class="${t.available?'ok':'no'}">${t.available?'✓ ready':'✗ missing'}</span></div>`).join('');
+}
+
+async function refresh(keepSelection=true){
+  const old=selected;artifacts=await api('/api/artifacts');
+  if(keepSelection&&old&&artifacts.some(a=>a.id===old))selected=old;else if(!selected&&artifacts.length)selected=artifacts[artifacts.length-1].id;
+  renderArtifacts();
+  await Promise.all([renderFlags(),renderEvents()]);
+  if(selected)await renderSelected();
+}
+
+function setBusy(on,text=''){
+  analyzing=on;$('uploadButton').disabled=on;$('analyzeThis').disabled=on;$('analyzeChallenge').disabled=on;
+  $('busyText').innerHTML=on?`<span class="spinner"></span> ${escapeHtml(text)}`:'';
+  $('analysisState').textContent=on?'running':'';
+}
+
+async function runOne(id,button){
+  if(!selected||analyzing)return;button.disabled=true;const old=button.textContent;button.textContent='Running...';
+  try{await api(`/api/workbench/artifacts/${encodeURIComponent(selected)}/run/${encodeURIComponent(id)}`,{method:'POST'});await refresh()}
+  catch(e){alert(e.message)}finally{button.disabled=false;button.textContent=old}
+}
+
+async function runAllForArtifact(id){return api(`/api/workbench/artifacts/${encodeURIComponent(id)}/run-all`,{method:'POST'})}
+
+async function analyzeTree(rootId){
+  const done=new Set();let pass=0;let total=0;
+  while(pass<5&&total<60){
+    artifacts=await api('/api/artifacts');
+    const queue=artifacts.filter(a=>belongsToRoot(a,rootId)&&!done.has(a.id));
+    if(!queue.length)break;
+    for(const a of queue){
+      $('progressText').textContent=`Analyzing ${a.filename} (${total+1})…`;
+      try{await runAllForArtifact(a.id)}catch(e){console.error(e)}
+      done.add(a.id);total++;
+      if(total>=60)break;
+    }
+    pass++;
+  }
+  $('progressText').textContent=`Completed integrated analysis on ${done.size} artifact(s).`;
+}
+
+$('analyzeThis').onclick=async()=>{
+  if(!selected||analyzing)return;setBusy(true,'Analyzing artifact');
+  try{await runAllForArtifact(selected);await refresh()}catch(e){alert(e.message)}finally{setBusy(false)}
+};
+$('analyzeChallenge').onclick=async()=>{
+  const a=artifacts.find(x=>x.id===selected);if(!a||analyzing)return;const root=rootOf(a);setBusy(true,'Analyzing challenge tree');
+  try{await analyzeTree(root.id);await refresh()}catch(e){alert(e.message)}finally{setBusy(false)}
+};
+
+async function upload(file){
+  if(analyzing)return;setBusy(true,'Uploading and triaging');$('progressText').textContent='Removing demo evidence…';
+  try{
+    await api('/api/workbench/clear-demo',{method:'POST'});
+    const form=new FormData();form.append('file',file);
+    const result=await api('/api/upload',{method:'POST',body:form});selected=result.id;
+    await refresh();$('progressText').textContent='Running integrated tools…';
+    await analyzeTree(result.id);await refresh();
+  }catch(e){alert(e.message)}finally{setBusy(false);$('file').value=''}
+}
+
+$('uploadButton').onclick=()=>$('file').click();
+$('file').onchange=e=>{const f=e.target.files[0];if(f)upload(f)};
+const drop=$('drop');drop.ondragover=e=>{e.preventDefault();drop.classList.add('active')};drop.ondragleave=()=>drop.classList.remove('active');drop.ondrop=e=>{e.preventDefault();drop.classList.remove('active');const f=e.dataTransfer.files[0];if(f)upload(f)};
+
+$('demo').onclick=async()=>{
+  if(analyzing)return;setBusy(true,'Loading demo');
+  try{const r=await api('/api/demo',{method:'POST'});selected=r.id;await refresh()}catch(e){alert(e.message)}finally{setBusy(false)}
+};
+$('newChallenge').onclick=async()=>{
+  if(analyzing)return;if(!confirm('Clear all current artifacts, findings, flags, tool output, and timeline from this local workspace?'))return;
+  setBusy(true,'Clearing workspace');try{await api('/api/workbench/reset',{method:'POST'});selected=null;artifacts=[];$('progressText').textContent='';await refresh(false)}catch(e){alert(e.message)}finally{setBusy(false)}
+};
+$('showDemoFlags').onchange=renderFlags;
+
+function bytesToText(bytes){return new TextDecoder().decode(new Uint8Array(bytes))}
+function textToBytes(text){return Array.from(new TextEncoder().encode(text))}
+function b64Encode(text){let binary='';for(const b of textToBytes(text))binary+=String.fromCharCode(b);return btoa(binary)}
+function b64Decode(text){const binary=atob(text.replace(/\s+/g,''));return bytesToText(Array.from(binary,c=>c.charCodeAt(0)))}
+function rot13(s){return s.replace(/[A-Za-z]/g,c=>String.fromCharCode((c<='Z'?65:97)+(c.charCodeAt(0)-(c<='Z'?65:97)+13)%26))}
+function flagMatches(s){const rx=/[A-Za-z0-9_-]{2,30}\{[^}\r\n]{3,200}\}/g;return [...new Set(s.match(rx)||[])]}
+
+document.querySelectorAll('[data-decode]').forEach(b=>b.onclick=()=>{
+  const input=$('decoderInput').value;let out='';
+  try{
+    switch(b.dataset.decode){
+      case'b64d':out=b64Decode(input);break;case'b64e':out=b64Encode(input);break;
+      case'hexd':{const clean=input.replace(/0x|[^0-9a-fA-F]/g,'');if(clean.length%2)throw new Error('Hex input must contain an even number of digits.');const bytes=[];for(let i=0;i<clean.length;i+=2)bytes.push(parseInt(clean.slice(i,i+2),16));out=bytesToText(bytes);break}
+      case'hexe':out=textToBytes(input).map(b=>b.toString(16).padStart(2,'0')).join(' ');break;
+      case'url':out=decodeURIComponent(input.replace(/\+/g,' '));break;case'rot13':out=rot13(input);break;case'reverse':out=[...input].reverse().join('');break;
+      case'xor':{let key=$('xorKey').value.trim();const k=key.toLowerCase().startsWith('0x')?parseInt(key,16):parseInt(key,10);if(!Number.isInteger(k)||k<0||k>255)throw new Error('XOR key must be 0-255 or 0x00-0xff.');out=bytesToText(textToBytes(input).map(x=>x^k));break}
+      case'flags':{const found=flagMatches(input);out=found.length?found.join('\n'):'No flag-shaped strings found.';break}
+    }
+  }catch(e){out=`Error: ${e.message}`}
+  $('decoderOutput').value=out;
+});
+
+try{
+  const protocol=location.protocol==='https:'?'wss:':'ws:';const ws=new WebSocket(`${protocol}//${location.host}/ws`);
+  ws.onopen=()=>ws.send('ready');ws.onmessage=()=>{if(!analyzing)refresh()};
+}catch(e){}
+
+loadTools();refresh();
+</script>
+</body>
+</html>
