@@ -100,36 +100,64 @@ def _match_bundled_context(filename: str) -> tuple[str | None, str | None]:
     return best[1], best[2]
 
 
-def infer_challenge_context(root_id: str | None, title: str, description: str) -> tuple[str, str, str]:
-    """Fill missing title/description from the root artifact and bundled challenge docs.
+def _case_filenames(root_id: str | None) -> list[str]:
+    if not root_id:
+        return []
+    with core.db() as conn:
+        rows = conn.execute(
+            """
+            WITH RECURSIVE tree(id) AS (
+                SELECT ?
+                UNION
+                SELECT e.child_id FROM edges e JOIN tree t ON e.parent_id=t.id
+            )
+            SELECT a.filename,a.parent_id,a.created_at
+            FROM artifacts a JOIN tree t ON a.id=t.id
+            ORDER BY CASE WHEN a.id=? THEN 0 ELSE 1 END, a.created_at
+            LIMIT 300
+            """,
+            (root_id, root_id),
+        ).fetchall()
+    return [row["filename"] or "" for row in rows if row["filename"]]
 
-    User-supplied wording always wins. Bundled-document matching is only a
-    convenience for this Hack4Gov challenge pack; arbitrary CTF uploads still
-    work through normal artifact triage when no document match exists.
+
+def infer_challenge_context(root_id: str | None, title: str, description: str) -> tuple[str, str, str]:
+    """Fill missing context from any artifact in the current case tree.
+
+    User-supplied wording always wins. For bundled Hack4Gov cases this can match
+    either the root artifact or a member of a multi-file/folder case against the
+    bundled challenge document. Arbitrary CTF uploads still fall back to normal
+    artifact triage when no bundled-document match exists.
     """
     supplied_title = (title or "").strip()
     supplied_description = (description or "").strip()
-    filename = ""
-
-    if root_id:
-        with core.db() as conn:
-            row = conn.execute("SELECT filename FROM artifacts WHERE id=?", (root_id,)).fetchone()
-            if row:
-                filename = row["filename"] or ""
+    filenames = _case_filenames(root_id)
 
     matched_title = None
     matched_description = None
-    if filename and (not supplied_title or not supplied_description):
-        matched_title, matched_description = _match_bundled_context(filename)
+    matched_filename = ""
+    if not supplied_title or not supplied_description:
+        for filename in filenames:
+            # Synthetic bundle manifests are useful evidence but not useful titles.
+            if filename == "autopilot_case_manifest.json":
+                continue
+            mt, md = _match_bundled_context(filename)
+            if mt:
+                matched_title, matched_description, matched_filename = mt, md, filename
+                break
 
-    final_title = supplied_title or matched_title or (_pretty_filename(filename) if filename else "Untitled challenge")
+    display_filename = matched_filename or next(
+        (name for name in filenames if name != "autopilot_case_manifest.json"),
+        filenames[0] if filenames else "",
+    )
+    final_title = supplied_title or matched_title or (_pretty_filename(display_filename) if display_filename else "Untitled challenge")
     final_description = supplied_description or matched_description or ""
 
     if supplied_description:
         source = "user"
     elif matched_description:
         source = "bundled-challenge-document"
-    elif filename:
+    elif display_filename:
         source = "artifact-filename-only"
     else:
         source = "none"
