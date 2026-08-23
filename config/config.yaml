@@ -1,0 +1,35 @@
+﻿flags:
+  - 'H4G\{[^}\r\n]{3,200}\}'
+  - 'HACK4GOV\{[^}\r\n]{3,200}\}'
+  - 'hack4gov\{[^}\r\n]{3,200}\}'
+  - 'FLAG\{[^}\r\n]{3,200}\}'
+  - 'CTF\{[^}\r\n]{3,200}\}'
+  - 'govctf\{[^}\r\n]{3,200}\}'
+
+analysis:
+  auto_decode: true
+  auto_extract_archives: true
+  auto_carve: true
+
+limits:
+  max_upload_mb: 500
+  max_artifact_depth: 12
+  max_child_artifacts: 10000
+  max_analysis_time_seconds: 600
+  max_extracted_size_mb: 2048
+  max_decode_depth: 8
+
+web:
+  requests_per_second: 5
+  max_requests: 5000
+  request_timeout_seconds: 10
+  max_redirects: 10
+  authorized_targets:
+    - localhost
+    - 127.0.0.1
+
+cracking:
+  enabled: true
+  max_length: 8
+  max_time_seconds: 300
+  max_attempts: 1000000

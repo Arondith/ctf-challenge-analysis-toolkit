@@ -1,0 +1,1000 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>H4G CTF Analyzer</title>
+
+<style>
+
+:root {
+    color-scheme: dark;
+    --bg:#050b11;
+    --panel:#0b151f;
+    --panel2:#0e1c28;
+    --border:#203344;
+    --text:#e4edf4;
+    --muted:#7890a4;
+    --cyan:#42d4ff;
+    --green:#3ad67d;
+    --yellow:#ffd166;
+    --orange:#ff914d;
+    --red:#ff5151;
+}
+
+* {
+    box-sizing:border-box;
+}
+
+body {
+    margin:0;
+    background:
+        radial-gradient(circle at 20% 0,#102b40 0,transparent 32rem),
+        var(--bg);
+    color:var(--text);
+    font-family:Inter,Segoe UI,Arial,sans-serif;
+}
+
+button {
+    background:#102434;
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:9px 12px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+button:hover {
+    border-color:var(--cyan);
+}
+
+button.primary {
+    background:#06394a;
+    border-color:#146078;
+    color:#c5f6ff;
+}
+
+header {
+    height:64px;
+    padding:0 22px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:1px solid var(--border);
+    background:rgba(5,11,17,.9);
+    position:sticky;
+    top:0;
+    z-index:10;
+    backdrop-filter:blur(16px);
+}
+
+.brand {
+    font-weight:800;
+    letter-spacing:.11em;
+}
+
+.brand span {
+    color:var(--cyan);
+}
+
+.header-actions {
+    display:flex;
+    gap:8px;
+    align-items:center;
+}
+
+.flag-counter {
+    color:#ff8585;
+    font-weight:700;
+    margin-right:8px;
+}
+
+.layout {
+    min-height:calc(100vh - 64px);
+    display:grid;
+    grid-template-columns:280px minmax(0,1fr) 340px;
+}
+
+.left {
+    border-right:1px solid var(--border);
+}
+
+.right {
+    border-left:1px solid var(--border);
+}
+
+aside,
+main {
+    padding:15px;
+}
+
+.card {
+    background:linear-gradient(180deg,#0d1924,#09131c);
+    border:1px solid var(--border);
+    border-radius:12px;
+    margin-bottom:14px;
+    overflow:hidden;
+}
+
+.card h2 {
+    font-size:11px;
+    letter-spacing:.14em;
+    color:var(--muted);
+    margin:0;
+    padding:12px 14px;
+    border-bottom:1px solid var(--border);
+    text-transform:uppercase;
+}
+
+.inside {
+    padding:13px;
+}
+
+.drop {
+    border:1px dashed #355a72;
+    padding:27px 14px;
+    text-align:center;
+    border-radius:10px;
+    color:var(--muted);
+    background:rgba(66,212,255,.035);
+}
+
+.drop.active {
+    border-color:var(--cyan);
+    background:rgba(66,212,255,.08);
+}
+
+.artifact {
+    width:100%;
+    text-align:left;
+    background:transparent;
+    border-color:transparent;
+    margin-bottom:4px;
+}
+
+.artifact.selected {
+    background:#0d3040;
+    border-color:#255a6d;
+}
+
+.artifact small {
+    display:block;
+    color:var(--muted);
+    margin-top:3px;
+}
+
+.meta {
+    display:grid;
+    grid-template-columns:125px 1fr;
+    gap:8px 12px;
+}
+
+.meta dt {
+    color:var(--muted);
+}
+
+.meta dd {
+    margin:0;
+    word-break:break-all;
+}
+
+.badge {
+    font-size:11px;
+    color:#a9c2d4;
+    background:#142838;
+    border-radius:15px;
+    padding:3px 8px;
+}
+
+.finding {
+    margin-bottom:8px;
+    background:#0a1822;
+    border-left:3px solid #498dff;
+    border-radius:6px;
+    padding:10px;
+}
+
+.finding.high {
+    border-color:var(--orange);
+}
+
+.finding.medium {
+    border-color:var(--yellow);
+}
+
+.finding strong {
+    display:block;
+}
+
+.finding small {
+    color:var(--muted);
+}
+
+.flag {
+    border:1px solid rgba(255,81,81,.4);
+    background:rgba(255,81,81,.08);
+    border-radius:9px;
+    padding:11px;
+    margin-bottom:9px;
+}
+
+.flag-value {
+    color:#ff8989;
+    font-family:Consolas,monospace;
+    font-weight:700;
+    word-break:break-all;
+}
+
+.flag small {
+    color:var(--muted);
+}
+
+.actions {
+    display:flex;
+    gap:5px;
+    margin-top:8px;
+    flex-wrap:wrap;
+}
+
+.tool {
+    display:flex;
+    justify-content:space-between;
+    padding:5px 0;
+}
+
+.ok {
+    color:var(--green);
+}
+
+.no {
+    color:#647a8b;
+}
+
+.event {
+    border-bottom:1px solid #172634;
+    padding:8px 0;
+}
+
+.event small {
+    color:var(--muted);
+}
+
+.empty {
+    padding:24px;
+    color:var(--muted);
+    text-align:center;
+}
+
+.graph {
+    font-family:Consolas,monospace;
+    white-space:pre-wrap;
+    color:#a7dceb;
+}
+
+@media(max-width:1050px) {
+
+    .layout {
+        grid-template-columns:240px 1fr;
+    }
+
+    .right {
+        grid-column:1 / -1;
+        border-left:0;
+        border-top:1px solid var(--border);
+    }
+}
+
+@media(max-width:720px) {
+
+    .layout {
+        display:block;
+    }
+
+    .left,
+    .right {
+        border:0;
+    }
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+
+<div class="brand">
+<span>H4G</span> // CTF ANALYZER
+</div>
+
+<div class="header-actions">
+
+<span id="flagCounter" class="flag-counter">
+🚩 0
+</span>
+
+<button id="demo">
+Load Demo
+</button>
+
+<button id="uploadButton" class="primary">
+Upload Artifact
+</button>
+
+<input id="file" type="file" hidden>
+
+</div>
+</header>
+
+
+<div class="layout">
+
+<aside class="left">
+
+<div class="card">
+
+<h2>Challenge Artifact</h2>
+
+<div class="inside">
+
+<div id="drop" class="drop">
+Drop challenge file here
+<br><br>
+<small>
+Uploaded files are treated as untrusted data.
+</small>
+</div>
+
+</div>
+</div>
+
+
+<div class="card">
+
+<h2>Artifacts</h2>
+
+<div id="artifactList" class="inside">
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>Artifact Graph</h2>
+
+<div id="graph" class="inside graph">
+</div>
+
+</div>
+
+</aside>
+
+
+<main>
+
+<div id="details" class="card">
+
+<div class="empty">
+Upload a challenge artifact or load the safe demo.
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>
+Findings / Recommendations
+</h2>
+
+<div id="findings" class="inside">
+
+<div class="empty">
+No findings yet.
+</div>
+
+</div>
+</div>
+
+</main>
+
+
+<aside class="right">
+
+<div class="card">
+
+<h2>
+Possible Flags
+</h2>
+
+<div id="flags" class="inside">
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>
+Analysis Tools
+</h2>
+
+<div id="tools" class="inside">
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>
+Evidence Timeline
+</h2>
+
+<div id="events" class="inside">
+</div>
+
+</div>
+
+</aside>
+
+</div>
+
+
+<script>
+
+let artifacts = [];
+let selected = null;
+
+
+function $(id) {
+    return document.getElementById(id);
+}
+
+
+function escapeHtml(value) {
+
+    return String(value ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+}
+
+
+async function api(url, options={}) {
+
+    const response = await fetch(
+        url,
+        options
+    );
+
+    if(!response.ok) {
+
+        throw new Error(
+            await response.text()
+        );
+    }
+
+    return response.json();
+}
+
+
+function depthOf(artifact) {
+
+    let depth = 0;
+    let current = artifact;
+    const visited = new Set();
+
+    while(
+        current &&
+        current.parent_id &&
+        !visited.has(current.id)
+    ) {
+
+        visited.add(current.id);
+
+        current = artifacts.find(
+            x => x.id === current.parent_id
+        );
+
+        depth++;
+    }
+
+    return depth;
+}
+
+
+function renderArtifacts() {
+
+    if(!artifacts.length) {
+
+        $("artifactList").innerHTML =
+            '<div class="empty">No artifacts.</div>';
+
+        $("graph").textContent =
+            "No artifact graph.";
+
+        return;
+    }
+
+    $("artifactList").innerHTML =
+        artifacts.map(a => {
+
+            const depth = depthOf(a);
+
+            return `
+            <button
+                class="artifact ${a.id===selected ? "selected" : ""}"
+                data-id="${escapeHtml(a.id)}"
+                style="padding-left:${8 + depth*15}px"
+            >
+                ${depth ? "└─ " : ""}
+                ${escapeHtml(a.filename)}
+
+                <small>
+                    ${escapeHtml(a.kind)}
+                    ·
+                    ${escapeHtml(a.id)}
+                </small>
+            </button>
+            `;
+
+        }).join("");
+
+
+    document
+        .querySelectorAll("[data-id]")
+        .forEach(button => {
+
+            button.onclick = () => {
+
+                selected =
+                    button.dataset.id;
+
+                renderArtifacts();
+                renderSelected();
+            };
+        });
+
+
+    let graph = "";
+
+    for(const a of artifacts) {
+
+        graph +=
+            `${"  ".repeat(depthOf(a))}` +
+            `${depthOf(a) ? "└─ " : ""}` +
+            `${a.filename} [${a.id}]\n`;
+    }
+
+    $("graph").textContent =
+        graph;
+}
+
+
+function renderSelected() {
+
+    const a = artifacts.find(
+        x => x.id === selected
+    );
+
+    if(!a) return;
+
+
+    $("details").innerHTML = `
+
+        <h2>
+            ${escapeHtml(a.filename)}
+        </h2>
+
+        <div class="inside">
+
+        <dl class="meta">
+
+        <dt>Artifact</dt>
+        <dd>${escapeHtml(a.id)}</dd>
+
+        <dt>Type</dt>
+        <dd>
+            <span class="badge">
+                ${escapeHtml(a.kind)}
+            </span>
+        </dd>
+
+        <dt>MIME</dt>
+        <dd>${escapeHtml(a.mime)}</dd>
+
+        <dt>Size</dt>
+        <dd>${Number(a.size).toLocaleString()} bytes</dd>
+
+        <dt>Entropy</dt>
+        <dd>${a.entropy}</dd>
+
+        <dt>SHA-256</dt>
+        <dd>${escapeHtml(a.sha256)}</dd>
+
+        <dt>Origin</dt>
+        <dd>${escapeHtml(a.origin)}</dd>
+
+        <dt>Technique</dt>
+        <dd>${escapeHtml(a.technique)}</dd>
+
+        </dl>
+
+        <br>
+
+        <a href="/api/artifacts/${encodeURIComponent(a.id)}/download">
+            <button>
+                Download Artifact
+            </button>
+        </a>
+
+        </div>
+    `;
+
+
+    $("findings").innerHTML =
+        a.findings.length
+        ?
+        a.findings.map(f => `
+
+            <div class="finding ${escapeHtml(f.severity)}">
+
+                <strong>
+                    ${escapeHtml(f.title)}
+                </strong>
+
+                <small>
+                    ${escapeHtml(f.category)}
+                    ·
+                    ${Math.round(f.confidence*100)}%
+                </small>
+
+                ${f.value
+                    ? `<div>${escapeHtml(f.value)}</div>`
+                    : ""
+                }
+
+            </div>
+
+        `).join("")
+        :
+        '<div class="empty">No findings.</div>';
+}
+
+
+async function renderFlags() {
+
+    const flags =
+        await api("/api/flags");
+
+    $("flagCounter").textContent =
+        `🚩 ${flags.length}`;
+
+
+    $("flags").innerHTML =
+        flags.length
+        ?
+        flags.map(f => `
+
+        <div class="flag">
+
+            <div class="flag-value">
+                ${escapeHtml(f.flag)}
+            </div>
+
+            <small>
+                ${escapeHtml(f.artifact_id)}
+                ·
+                ${Math.round(f.confidence*100)}%
+                ·
+                ${escapeHtml(f.status)}
+            </small>
+
+            <div>
+                ${escapeHtml(f.technique)}
+            </div>
+
+            <div class="actions">
+
+            <button
+                data-copy="${escapeHtml(f.flag)}"
+            >
+                Copy
+            </button>
+
+            <button
+                data-flag="${f.id}"
+                data-status="confirmed"
+            >
+                Confirm
+            </button>
+
+            <button
+                data-flag="${f.id}"
+                data-status="false-positive"
+            >
+                False Positive
+            </button>
+
+            </div>
+
+        </div>
+
+        `).join("")
+        :
+        '<div class="empty">No flag candidates.</div>';
+
+
+    document
+        .querySelectorAll("[data-copy]")
+        .forEach(button => {
+
+            button.onclick = async () => {
+
+                await navigator.clipboard.writeText(
+                    button.dataset.copy
+                );
+            };
+        });
+
+
+    document
+        .querySelectorAll("[data-flag]")
+        .forEach(button => {
+
+            button.onclick = async () => {
+
+                await api(
+                    `/api/flags/${button.dataset.flag}/${button.dataset.status}`,
+                    {
+                        method:"PATCH"
+                    }
+                );
+
+                await refresh();
+            };
+        });
+}
+
+
+async function renderEvents() {
+
+    const events =
+        await api("/api/events");
+
+
+    $("events").innerHTML =
+        events.length
+        ?
+        events.slice(0,40).map(e => `
+
+        <div class="event">
+
+            <strong>
+                ${escapeHtml(e.action)}
+            </strong>
+
+            <div>
+                ${escapeHtml(e.detail)}
+            </div>
+
+            <small>
+                ${new Date(e.created_at).toLocaleString()}
+            </small>
+
+        </div>
+
+        `).join("")
+        :
+        '<div class="empty">No events.</div>';
+}
+
+
+async function loadTools() {
+
+    const tools =
+        await api("/api/tools");
+
+
+    $("tools").innerHTML =
+        tools.map(tool => `
+
+        <div class="tool">
+
+        <span>
+            ${escapeHtml(tool.name)}
+        </span>
+
+        <span class="${tool.available ? "ok" : "no"}">
+
+            ${tool.available
+                ? "✓ available"
+                : "✗ missing"
+            }
+
+        </span>
+
+        </div>
+
+        `).join("");
+}
+
+
+async function refresh() {
+
+    artifacts =
+        await api("/api/artifacts");
+
+    if(
+        !selected &&
+        artifacts.length
+    ) {
+
+        selected =
+            artifacts[
+                artifacts.length-1
+            ].id;
+    }
+
+    renderArtifacts();
+    renderSelected();
+
+    await renderFlags();
+    await renderEvents();
+}
+
+
+async function upload(file) {
+
+    const form =
+        new FormData();
+
+    form.append(
+        "file",
+        file
+    );
+
+    $("uploadButton").disabled =
+        true;
+
+    $("uploadButton").textContent =
+        "Analyzing...";
+
+    try {
+
+        const result =
+            await api(
+                "/api/upload",
+                {
+                    method:"POST",
+                    body:form
+                }
+            );
+
+        selected =
+            result.id;
+
+        await refresh();
+
+    } catch(error) {
+
+        alert(
+            error.message
+        );
+
+    } finally {
+
+        $("uploadButton").disabled =
+            false;
+
+        $("uploadButton").textContent =
+            "Upload Artifact";
+    }
+}
+
+
+$("uploadButton").onclick =
+    () => $("file").click();
+
+
+$("file").onchange =
+    event => {
+
+        const file =
+            event.target.files[0];
+
+        if(file) upload(file);
+    };
+
+
+$("demo").onclick =
+    async () => {
+
+        const result =
+            await api(
+                "/api/demo",
+                {
+                    method:"POST"
+                }
+            );
+
+        selected =
+            result.id;
+
+        await refresh();
+    };
+
+
+const drop =
+    $("drop");
+
+
+drop.ondragover =
+    event => {
+
+        event.preventDefault();
+
+        drop.classList.add(
+            "active"
+        );
+    };
+
+
+drop.ondragleave =
+    () => {
+
+        drop.classList.remove(
+            "active"
+        );
+    };
+
+
+drop.ondrop =
+    event => {
+
+        event.preventDefault();
+
+        drop.classList.remove(
+            "active"
+        );
+
+        const file =
+            event.dataTransfer.files[0];
+
+        if(file) upload(file);
+    };
+
+
+try {
+
+    const protocol =
+        location.protocol === "https:"
+        ? "wss:"
+        : "ws:";
+
+    const ws =
+        new WebSocket(
+            `${protocol}//${location.host}/ws`
+        );
+
+    ws.onopen =
+        () => ws.send("ready");
+
+    ws.onmessage =
+        () => refresh();
+
+} catch(error) {}
+
+
+loadTools();
+refresh();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,31 @@
+﻿services:
+
+  ctf-analyzer:
+
+    build: .
+
+    container_name:
+      h4g-ctf-analyzer
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ./workspace:/workspace
+      - ./config:/app/config:ro
+
+    environment:
+      CTF_WORKSPACE: /workspace
+      CTF_CONFIG: /app/config/config.yaml
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
+    pids_limit: 256
+
+    mem_limit: 2g
+
+    restart: unless-stopped

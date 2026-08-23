@@ -1,0 +1,38 @@
+From this folder:
+
+C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit
+
+run these commands in order:
+
+python -m venv .venv
+
+Then:
+
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+
+Then install the tool requirements:
+
+.\.venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
+
+Then start the server:
+
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+
+When you see:
+
+Uvicorn running on http://127.0.0.1:8000
+
+open this in your browser:
+
+http://127.0.0.1:8000
+
+You do not need Docker.
+
+After the first setup, next time you only need:
+
+cd "C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit"
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+
+Keep that PowerShell window open while using the tool. To stop it, press:
+
+Ctrl + C

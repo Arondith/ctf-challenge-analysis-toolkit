@@ -1,0 +1,11 @@
+﻿password
+admin
+root
+flag
+ctf
+hack4gov
+H4G
+123456
+challenge
+secret
+letmein
