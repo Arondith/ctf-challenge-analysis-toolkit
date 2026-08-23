@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CTF AUTOPILOT</title>
+<style>
+:root{color-scheme:dark;--bg:#05090d;--panel:#0a131b;--line:#1c3442;--text:#edf6fb;--muted:#88a0ae;--cyan:#43d7ff;--green:#38df82;--amber:#ffd166;--red:#ff667a}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -20%,#16405a 0,transparent 42rem),var(--bg);color:var(--text);font:15px Inter,Segoe UI,Arial,sans-serif}button,input,textarea,select{font:inherit}header{height:66px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:rgba(5,9,13,.92);backdrop-filter:blur(14px)}.brand{font-weight:950;letter-spacing:.12em}.brand span{color:var(--cyan)}header a{color:#afc5d2;text-decoration:none;margin-left:18px}main{width:min(900px,calc(100% - 28px));margin:0 auto;padding:58px 0 80px}.hero{text-align:center;margin-bottom:28px}.hero h1{font-size:clamp(38px,7vw,72px);margin:0;letter-spacing:-.045em}.hero h1 span{color:var(--cyan)}.tag{font-size:20px;color:#bed3df;margin-top:10px}.card{border:1px solid var(--line);background:linear-gradient(180deg,#0d1a24,#081117);border-radius:18px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.25)}.drop{border:2px dashed #315970;border-radius:15px;padding:54px 20px;text-align:center;cursor:pointer;background:rgba(67,215,255,.025);transition:.15s}.drop:hover,.drop.active{border-color:var(--cyan);background:rgba(67,215,255,.07)}.drop strong{display:block;font-size:20px;margin-bottom:8px}.drop small{color:var(--muted)}.selected{margin-top:12px;color:#cce7f4;font-weight:700}.context{margin-top:18px}label{display:block;color:#b9cfda;margin:12px 0 6px;font-weight:700}textarea,input,select{width:100%;border:1px solid var(--line);background:#050d12;color:var(--text);padding:11px 12px;border-radius:10px;outline:none}textarea{min-height:100px;resize:vertical}textarea:focus,input:focus,select:focus{border-color:var(--cyan)}.row{display:grid;grid-template-columns:1fr 220px;gap:12px}@media(max-width:650px){.row{grid-template-columns:1fr}}button.solve{width:100%;margin-top:18px;border:1px solid #1683a4;border-radius:12px;background:linear-gradient(180deg,#0b7595,#07566e);color:white;padding:15px;font-weight:900;font-size:17px;cursor:pointer}button.solve:hover{filter:brightness(1.08)}button:disabled{opacity:.55;cursor:wait}.hidden{display:none!important}.status-card{margin-top:18px}.state{font-size:12px;letter-spacing:.14em;color:var(--cyan);font-weight:900}.progress-title{font-size:26px;font-weight:900;margin:6px 0}.plan{color:#b9ccd6;margin-bottom:16px}.bar{height:7px;border-radius:10px;background:#0d2633;overflow:hidden;margin:12px 0 20px}.bar span{display:block;height:100%;width:16%;background:linear-gradient(90deg,#1ba0c7,#48e7ff);transition:.3s}.timeline{max-height:330px;overflow:auto;border-top:1px solid var(--line)}.event{padding:11px 2px;border-bottom:1px solid #142630;color:#cadbe4}.event small{display:block;color:var(--muted);margin-top:3px}.event.progress{color:#bff7d4}.event.fallback,.event.adapt{color:#ffe2a3}.event.solved{color:var(--green);font-weight:800}.result{text-align:center;padding:32px 20px}.check{font-size:44px;color:var(--green)}.result h2{margin:8px 0 18px}.flag{font:900 clamp(22px,5vw,38px) Consolas,monospace;color:var(--green);word-break:break-word;padding:18px;border:1px solid rgba(56,223,130,.35);border-radius:12px;background:rgba(56,223,130,.05)}.confidence{color:var(--muted);margin:13px 0}.copy{border:1px solid #2b7350;background:#133b2a;color:#d9ffea;padding:10px 16px;border-radius:9px;cursor:pointer;font-weight:800}.blocked{border-color:#705d2f;background:linear-gradient(180deg,#211c0e,#11100a)}.blocked .state{color:var(--amber)}details{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}summary{cursor:pointer;color:#bcd3df;font-weight:800}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:12px}.stat{padding:10px;border-radius:9px;background:#07121a;border:1px solid #17303e}.stat b{display:block;font-size:18px}.stat small{color:var(--muted)}.technical{font:12px Consolas,monospace;white-space:pre-wrap;color:#a9bec9;margin-top:12px}.links{text-align:center;margin-top:18px}.links a{color:#86dff7;margin:0 8px;text-decoration:none}.retry{color:var(--amber);font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+<header><div class="brand"><span>CTF</span> AUTOPILOT</div><nav><a href="/workbench">Technical Workbench</a><a href="/challenge-library">Challenge Library</a></nav></header>
+<main>
+<section class="hero"><h1>Drop the challenge.<br><span>Get the flag.</span></h1><div class="tag">You upload it. Autopilot investigates, adapts, follows evidence, and verifies the answer.</div></section>
+
+<section id="uploadCard" class="card">
+  <div id="drop" class="drop">
+    <strong>Drop a challenge file here</strong>
+    <small>EXE · PCAP · ZIP · image · audio · document · source · challenge artifact</small>
+    <input id="file" type="file" hidden>
+  </div>
+  <div id="selected" class="selected hidden"></div>
+  <div class="context">
+    <label for="description">Challenge description / hint <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+    <textarea id="description" placeholder="Paste the challenge wording if you have it. Leave blank and Autopilot will infer context when possible."></textarea>
+    <div class="row">
+      <div><label for="title">Challenge title <span style="color:var(--muted);font-weight:400">(optional)</span></label><input id="title" placeholder="Auto-detect when possible"></div>
+      <div><label for="mode">Reasoning</label><select id="mode"><option value="auto">Best available</option><option value="local">Local only</option><option value="ai">Enhanced</option></select></div>
+    </div>
+    <button id="solve" class="solve">SOLVE CHALLENGE</button>
+  </div>
+</section>
+
+<section id="statusCard" class="card status-card hidden">
+  <div id="state" class="state">INVESTIGATING</div>
+  <div id="progressTitle" class="progress-title">Understanding challenge…</div>
+  <div id="plan" class="plan"></div>
+  <div class="bar"><span id="bar"></span></div>
+  <div id="retry" class="retry hidden">Connection interrupted. Autopilot is retrying automatically…</div>
+  <div id="timeline" class="timeline"></div>
+  <details><summary>View investigation</summary><div id="stats" class="stats"></div><pre id="technical" class="technical"></pre></details>
+</section>
+
+<section id="resultCard" class="card status-card hidden">
+  <div class="result">
+    <div class="check">✓</div><h2>CHALLENGE SOLVED</h2>
+    <div id="flag" class="flag"></div>
+    <div id="confidence" class="confidence"></div>
+    <button id="copy" class="copy">COPY FLAG</button>
+    <div id="why" class="plan" style="margin-top:16px"></div>
+  </div>
+</section>
+
+<section id="blockedCard" class="card status-card blocked hidden">
+  <div class="state">CASE SUSPENDED — EXTERNAL BLOCKER</div>
+  <div class="progress-title">Internal paths exhausted</div>
+  <div id="blocker" class="plan"></div>
+  <p style="color:var(--muted)">The case is preserved. Add the missing evidence later and Autopilot can resume from its existing investigation state.</p>
+</section>
+
+<div class="links"><a href="/workbench">View technical workbench</a><a href="/solve-assistant">Legacy solve assistant</a></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let selectedFile=null,rootId=null,caseId=null,running=false,continueTimer=null;
+async function api(url,opt={}){const r=await fetch(url,opt);let x;try{x=await r.json()}catch{x={detail:await r.text()}}if(!r.ok)throw new Error(x.detail||('HTTP '+r.status));return x}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+function chooseFile(f){selectedFile=f;$('selected').textContent='Selected: '+f.name;$('selected').classList.remove('hidden')}
+$('drop').onclick=()=>$('file').click();$('file').onchange=e=>{if(e.target.files[0])chooseFile(e.target.files[0])};
+$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('active')};$('drop').ondragleave=()=>$('drop').classList.remove('active');$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('active');if(e.dataTransfer.files[0])chooseFile(e.dataTransfer.files[0])};
+function stagePct(stage){return Math.min(94,8+Number(stage||1)*12)}
+function render(x){caseId=x.case_id;rootId=x.root_artifact_id;$('statusCard').classList.remove('hidden');$('state').textContent=x.state.replaceAll('_',' ');$('progressTitle').textContent=x.state==='STRATEGY_RESET'?'Changing strategy…':x.state==='FALLBACK'?'Trying another method…':x.state==='FOLLOWING_EVIDENCE'?'Following new evidence…':'Investigating…';$('plan').textContent=x.current_plan||'';$('bar').style.width=stagePct(x.stage)+'%';$('timeline').innerHTML=(x.timeline||[]).map(e=>`<div class="event ${esc(e.level)}">${esc(e.message)}<small>${esc(e.created_at)}</small></div>`).join('');let counts={};for(const a of (x.action_counts||[]))counts[a.state]=(counts[a.state]||0)+Number(a.n||0);$('stats').innerHTML=`<div class="stat"><b>${x.artifact_count||0}</b><small>Artifacts</small></div><div class="stat"><b>${counts.SUCCESS||0}</b><small>Successful actions</small></div><div class="stat"><b>${counts.FAILED||0}</b><small>Failed paths adapted</small></div><div class="stat"><b>${x.strategy_resets||0}</b><small>Strategy resets</small></div>`;$('technical').textContent=JSON.stringify({case_id:x.case_id,stage:x.stage_name,stagnation:x.stagnation,dead_ends:x.dead_end_count,tick:x.tick||null,context_source:x.context_source||null},null,2);
+if(x.state==='SOLVED'&&x.flag){running=false;$('statusCard').classList.add('hidden');$('blockedCard').classList.add('hidden');$('resultCard').classList.remove('hidden');$('flag').textContent=x.flag;$('confidence').textContent=`Confidence: ${Math.round((x.confidence||0)*100)}%`;$('why').textContent=(x.reasoning&&x.reasoning.reasoning_summary)?String(x.reasoning.reasoning_summary).slice(0,700):'Recovered and verified from challenge evidence.';return 'done'}
+if(x.state==='SUSPENDED_EXTERNAL_BLOCKER'){running=false;$('blockedCard').classList.remove('hidden');$('blocker').textContent=x.blocker||'Required external evidence is unavailable.';return 'done'}return 'continue'}
+async function upload(){await api('/api/workbench/clear-demo',{method:'POST'});const form=new FormData();form.append('file',selectedFile);const r=await api('/api/upload',{method:'POST',body:form});return r.id}
+async function advance(first=false){if(!running)return;try{$('retry').classList.add('hidden');let x;if(first){x=await api('/api/autopilot/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({root_artifact_id:rootId,title:$('title').value,description:$('description').value,mode:$('mode').value})})}else{x=await api(`/api/autopilot/cases/${caseId}/continue`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:$('mode').value})})}const state=render(x);if(state==='continue'&&running)continueTimer=setTimeout(()=>advance(false),350)}catch(e){if(!running)return;$('retry').classList.remove('hidden');$('retry').textContent='Investigation request interrupted: '+e.message+' — retrying automatically…';continueTimer=setTimeout(()=>advance(caseId===null),1500)}}
+$('solve').onclick=async()=>{if(running)return;if(!selectedFile){$('drop').click();return}running=true;caseId=null;$('solve').disabled=true;$('solve').textContent='AUTOPILOT RUNNING…';$('resultCard').classList.add('hidden');$('blockedCard').classList.add('hidden');$('statusCard').classList.remove('hidden');$('timeline').innerHTML='<div class="event">Uploading challenge and starting investigation…</div>';try{rootId=await upload();await advance(true)}catch(e){running=false;$('solve').disabled=false;$('solve').textContent='SOLVE CHALLENGE';$('retry').classList.remove('hidden');$('retry').textContent='Upload/start failed: '+e.message}}
+$('copy').onclick=async()=>{await navigator.clipboard.writeText($('flag').textContent);$('copy').textContent='COPIED ✓';setTimeout(()=>$('copy').textContent='COPY FLAG',1200)};
+</script>
+</body>
+</html>
