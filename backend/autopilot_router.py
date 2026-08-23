@@ -20,6 +20,7 @@ from backend.autopilot_engine import (
     create_or_resume_case,
     run_case_tick,
 )
+from backend.autopilot_state import refresh_case_reasoning_state
 from backend.challenge_context import infer_challenge_context
 
 router = APIRouter()
@@ -81,13 +82,22 @@ async def _reason_about_case(snapshot: dict, mode: str) -> dict:
     timeline = "\n".join(
         f"- {item['message']}" for item in snapshot.get("timeline", [])[-20:]
     )
+    target = snapshot.get("solve_target") or {}
+    hypotheses = snapshot.get("hypotheses") or []
+    hypothesis_text = "\n".join(
+        f"- {item['statement']} ({float(item['confidence']):.0%})"
+        for item in hypotheses[:8]
+    )
     evidence = (
         f"CTF AUTOPILOT CASE STATE\n"
         f"State: {snapshot['state']}\n"
         f"Stage: {snapshot['stage_name']}\n"
         f"Current plan: {snapshot['current_plan']}\n"
+        f"Solve target: {target.get('answer_type', 'unknown')}\n"
+        f"Target completion: {json.dumps(target.get('completion', {}), sort_keys=True)}\n"
         f"Artifacts: {snapshot['artifact_count']}\n"
         f"Strategy resets: {snapshot['strategy_resets']}\n\n"
+        f"ACTIVE HYPOTHESES\n{hypothesis_text or '- none yet'}\n\n"
         f"RECENT INVESTIGATION TIMELINE\n{timeline}\n\n"
         + evidence
     )
@@ -122,7 +132,10 @@ async def _reason_about_case(snapshot: dict, mode: str) -> dict:
 
 
 async def _advance(case_id: int, mode: str) -> dict:
+    pre_state = refresh_case_reasoning_state(case_id)
     snapshot = await run_case_tick(case_id)
+    post_state = refresh_case_reasoning_state(case_id)
+    snapshot.update(post_state)
     reasoned = None
 
     # Correlation/riddle reasoning is another solver capability, not a user-facing
@@ -147,6 +160,7 @@ async def _advance(case_id: int, mode: str) -> dict:
             reasoned.get("reasoning_summary", "") if reasoned else "",
         ):
             snapshot = case_snapshot(case_id)
+            snapshot.update(refresh_case_reasoning_state(case_id))
 
     snapshot["reasoning"] = reasoned
     return snapshot
@@ -169,6 +183,8 @@ def autopilot_status():
         "internal_fallback_parsers": True,
         "multi_file_cases": True,
         "resumable_cases": True,
+        "solve_target_tracking": True,
+        "competing_hypotheses": True,
         "enhanced_reasoning": bool(reasoning.OPENAI_API_KEY),
     }
 
@@ -252,8 +268,10 @@ async def add_case_evidence(case_id: int, files: list[UploadFile] = File(...)):
         conn.commit()
 
     await core.hub.broadcast({"event": "autopilot-new-evidence", "artifact_id": case["root_artifact_id"]})
+    result = case_snapshot(case_id)
+    result.update(refresh_case_reasoning_state(case_id))
     return {
-        "case": case_snapshot(case_id),
+        "case": result,
         "artifacts": imported,
         "files": len(loaded),
         "total_bytes": total,
@@ -285,6 +303,8 @@ async def continue_case(case_id: int, req: ContinueRequest):
 @router.get("/api/autopilot/cases/{case_id}")
 def get_case(case_id: int):
     try:
-        return case_snapshot(case_id)
+        result = case_snapshot(case_id)
+        result.update(refresh_case_reasoning_state(case_id))
+        return result
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
