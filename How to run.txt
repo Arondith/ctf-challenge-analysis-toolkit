@@ -1,8 +1,8 @@
 H4G CTF Challenge Analysis Workbench
 ====================================
 
-The Docker build contains the integrated forensic/reverse-engineering toolchain
-and the Hack4Gov challenge-pack-aware extensions.
+The Docker build contains the integrated forensic/reverse-engineering toolchain,
+the Hack4Gov challenge-pack-aware extensions, and the Solve Assistant.
 
 MAIN MODULES
 ------------
@@ -18,6 +18,12 @@ http://127.0.0.1:8000/workbench
     binaries, QR/barcodes, steganography, damaged-header repair, coordinates,
     USB HID/keylogger captures, recursive extraction, multi-protocol fragment
     correlation, flag detection, decoder lab, and evidence timeline.
+
+http://127.0.0.1:8000/solve-assistant
+    Solve Assistant: paste the challenge wording and correlate it with the
+    current artifact tree. Local mode stays inside Docker. Optional AI mode can
+    reason over a bounded evidence summary and saves a "how it was solved"
+    report. It also distinguishes clean CTF flags from noisy binary brace matches.
 
 http://127.0.0.1:8000/case-search
     Case Search: search across imported challenge artifacts for analyst names,
@@ -77,6 +83,27 @@ To stop, press Ctrl+C or run:
 docker compose down
 
 
+OPTIONAL AI SOLVE MODE
+----------------------
+
+The Solve Assistant works without AI in Local Reasoning mode.
+
+To enable AI mode for the current PowerShell session, set your API key as an
+environment variable BEFORE starting Docker. Do not put the key in GitHub or in
+the source files:
+
+$env:OPENAI_API_KEY="your-api-key-here"
+docker compose up
+
+Optional model override:
+
+$env:H4G_AI_MODEL="gpt-5.6"
+
+The browser never receives the API key. The backend sends only the challenge
+prompt plus a bounded evidence summary when AI mode is selected. Local mode does
+not send challenge content outside the workbench.
+
+
 ANALYSIS TOOLCHAIN
 ------------------
 
@@ -87,8 +114,8 @@ pdftotext, pdfimages, bsdtar, and zbarimg.
 The workbench also contains Python analysis modules for Base64/Base32/hex/URL
 and XOR decoding, whitespace steganography, CSV-aware GPS coordinate analysis,
 email header extraction, damaged-header repair/signature scans, embedded HTML/
-CSS data-URI extraction, visual cryptography, case-wide evidence search, and
-USB HID decoding.
+CSS data-URI extraction, visual cryptography, case-wide evidence search, USB HID
+decoding, clue reasoning, and stricter flag-candidate filtering.
 
 
 RECOMMENDED HACK4GOV WORKFLOW
@@ -98,30 +125,40 @@ For one of the bundled example challenges:
 
 1. Open Challenge Library.
 2. Import the relevant file or its containing folder.
-3. Open Artifact Workbench.
-4. Use Analyze Entire Challenge. The Hack4Gov runtime allows up to 250 related
-   artifacts so large image/audio folders can be processed in one case.
-5. Inspect Findings, Tool Output, Preview / Hex, Decoder Lab, Case Search, and
+3. Open Artifact Workbench and use Analyze Entire Challenge.
+4. Inspect Findings, Tool Output, Preview / Hex, Decoder Lab, Case Search, and
    Flag Candidates.
-6. For image-share challenges, open Visual Crypto Lab and combine the relevant
-   image artifacts. Then analyze the generated PNG artifacts in the Workbench.
+5. Open Solve Assistant and paste the COMPLETE challenge wording. This is
+   important for riddle/knowledge challenges where the prompt itself supplies
+   the decisive clue.
+6. Select Local Reasoning or AI mode and review the saved solve report.
+7. Validate the proposed flag against the required flag format before submitting.
 
-For a normal supplied file/PCAP/audio/document challenge:
+Example clue-style flow:
 
-1. Open Artifact Workbench.
-2. Upload the original challenge artifact.
-3. Allow Upload + Analyze to triage it.
-4. Use Analyze Entire Challenge to process recovered child artifacts.
-5. Inspect Tool Output, Preview / Hex, Decoder Lab, artifact graph, and flag
-   candidates without leaving the app.
+Challenge prompt
+  -> identify meaningful clue
+  -> compare with artifact evidence
+  -> use background knowledge only where clearly needed
+  -> reject noisy/non-printable regex candidates
+  -> format the candidate exactly as H4G{...}
+  -> save the explanation as a Solve Report
 
-For a web challenge:
+For image-share challenges, open Visual Crypto Lab and combine the relevant image
+artifacts, then analyze the generated PNG artifacts in the Workbench.
 
-1. Open Authorized Web Lab.
-2. Private CTF IPs such as 172.16.x.x are already within local/private scope.
-3. For a public CTF host, explicitly add the hostname to Authorized Scope.
-4. Enter the URL and inspect responses/redirects. The Web Lab does not provide
-   credential stuffing or destructive/off-scope actions.
+For a web challenge, use Authorized Web Lab. Private CTF IPs such as 172.16.x.x
+are already within local/private scope. Public hosts must be explicitly added to
+Authorized Scope. The Web Lab does not provide credential stuffing or destructive
+off-scope actions.
+
+
+FLAG FALSE-POSITIVE CLEANUP
+---------------------------
+
+The Hack4Gov runtime now rejects generic flag candidates containing non-ASCII or
+non-printable binary data. On startup it also removes old unconfirmed candidates
+from ctf.db that fail the stricter detector. Confirmed flags are preserved.
 
 
 WORKSPACE RECOVERY
