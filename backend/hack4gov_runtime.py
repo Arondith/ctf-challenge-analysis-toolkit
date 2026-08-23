@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from backend import hack4gov_pack as pack
 from backend import main as core
-from backend.solve_assistant import router as solve_router
+from backend.solver_prompt_patch import router as solve_router
 
 
 def full_tshark_fields() -> set[str]:
@@ -108,7 +108,12 @@ def prune_binary_flag_noise() -> int:
                 conn.execute("DELETE FROM flags WHERE id=?", (row["id"],))
                 removed += 1
         if removed:
-            core.add_event(conn, None, "Flag candidate cleanup", f"Removed {removed} binary/noisy regex false positives")
+            core.add_event(
+                conn,
+                None,
+                "Flag candidate cleanup",
+                f"Removed {removed} binary/noisy regex false positives",
+            )
     return removed
 
 
@@ -120,7 +125,7 @@ prune_binary_flag_noise()
 
 app = FastAPI(
     title="H4G CTF Workbench - Hack4Gov Runtime",
-    version="0.5.0",
+    version="0.5.1",
     description="Runtime wrapper for the challenge-pack-aware Hack4Gov CTF workbench.",
 )
 app.include_router(solve_router)
@@ -133,11 +138,11 @@ def runtime_coverage():
     features.extend(
         [
             "Solve Assistant with saved how-it-was-solved reports",
-            "optional OpenAI reasoning mode with backend-only API key",
+            "enhanced solve-first reasoning with backend-only configuration",
             "strict printable flag filtering and legacy false-positive cleanup",
         ]
     )
-    return {**base, "version": "0.5.0", "features": features}
+    return {**base, "version": "0.5.1", "features": features}
 
 
 @app.get("/workbench", response_class=HTMLResponse)
@@ -170,14 +175,23 @@ def hack4gov_tools():
     tools = list(pack.base.expanded_tools())
     names = {x.get("name") for x in tools}
     if "zbarimg" not in names:
-        tools.append({"name": "zbarimg", "available": shutil.which("zbarimg") is not None, "path": shutil.which("zbarimg")})
+        tools.append(
+            {
+                "name": "zbarimg",
+                "available": shutil.which("zbarimg") is not None,
+                "path": shutil.which("zbarimg"),
+            }
+        )
     return tools
 
 
 def tree_artifact_rows(root_artifact: str | None):
     with core.db() as conn:
         if root_artifact:
-            exists = conn.execute("SELECT id FROM artifacts WHERE id=?", (root_artifact,)).fetchone()
+            exists = conn.execute(
+                "SELECT id FROM artifacts WHERE id=?",
+                (root_artifact,),
+            ).fetchone()
             if not exists:
                 raise HTTPException(404, "Root artifact not found.")
             rows = conn.execute(
@@ -253,7 +267,12 @@ def case_search(q: str, root_artifact: str | None = None):
         if len(results) >= 100:
             break
 
-    return {"query": query, "root_artifact": root_artifact, "artifacts_scanned": scanned, "matches": results}
+    return {
+        "query": query,
+        "root_artifact": root_artifact,
+        "artifacts_scanned": scanned,
+        "matches": results,
+    }
 
 
 # All other routes come from the Hack4Gov pack, which in turn mounts the
