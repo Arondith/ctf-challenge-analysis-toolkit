@@ -47,22 +47,23 @@ RUN git clone --depth 1 --branch "${RADARE2_VERSION}" \
     && make install \
     && rm -rf /tmp/radare2
 
-# Fail the image build immediately if an expected analysis utility is missing.
-RUN set -eux; \
-    for tool in \
-        file strings xxd exiftool binwalk foremost tshark \
-        radare2 rabin2 readelf objdump nm zsteg steghide upx \
-        ffmpeg ffprobe sox pdfinfo pdftotext pdfimages bsdtar zbarimg; \
-    do \
-        command -v "$tool" >/dev/null; \
-    done
-
 WORKDIR /app
 
 COPY backend/requirements.txt /app/backend/requirements.txt
 
 RUN pip install --no-cache-dir \
     -r /app/backend/requirements.txt
+
+# Fail the image build immediately if an expected analysis utility is missing.
+RUN set -eux; \
+    for tool in \
+        file strings xxd exiftool binwalk foremost tshark \
+        radare2 rabin2 readelf objdump nm zsteg steghide upx \
+        ffmpeg ffprobe sox pdfinfo pdftotext pdfimages bsdtar zbarimg \
+        pyinstxtractor-ng pydisasm; \
+    do \
+        command -v "$tool" >/dev/null; \
+    done
 
 COPY . /app
 
