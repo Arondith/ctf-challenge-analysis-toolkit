@@ -1,0 +1,12 @@
+Team Meeting Minutes
+Date: 2024-11-02
+Attendees: A. Cruz, M. Santos, L. Gomez
+
+Topics:
+1. Q4 deliverables — postponed
+2. Resource allocation — review next week
+3. Security reminders — update required
+
+Action items:
+- M. Santos: update resource tracker
+- L. Gomez: schedule next meeting

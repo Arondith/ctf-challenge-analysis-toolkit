@@ -1,0 +1,1 @@
+A malware that could meddle with Windows services and registries, hide behind mutexes, spawn processes, encrypt files with AES, RC4, and XOR tricks, and even shuffle through PE headers while dragging ZLIB along for the ride. It spread by abusing a flaw in a very old Windows sharing mechanism, moving like a worm from host to host, until a “kill switch” domain was stumbled upon.
