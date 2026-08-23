@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>H4G Authorized Web Lab</title>
+<style>
+:root{color-scheme:dark;--bg:#050b11;--panel:#0b1721;--border:#203746;--text:#e7f0f6;--muted:#7d96a8;--cyan:#42d4ff;--green:#3ad67d;--red:#ff6868}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,Segoe UI,Arial,sans-serif}header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px}.brand{font-weight:900;letter-spacing:.1em}.brand span{color:var(--cyan)}a{color:#bfefff;text-decoration:none}main{max-width:1200px;margin:0 auto;padding:20px}.grid{display:grid;grid-template-columns:360px 1fr;gap:14px}.card{background:linear-gradient(180deg,#0d1b27,#08131c);border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden}.card h2{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);padding:11px 13px;border-bottom:1px solid var(--border);margin:0}.inside{padding:13px}input,textarea,select,button{font:inherit}input,textarea,select{width:100%;background:#06121b;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px;margin:5px 0 10px}textarea{min-height:110px;resize:vertical;font-family:Consolas,monospace}button{background:#0d2d3c;color:var(--text);border:1px solid #245166;border-radius:8px;padding:9px 12px;cursor:pointer}button:hover{border-color:var(--cyan)}button.primary{background:#073c4d}.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.scope{padding:7px 0;border-bottom:1px solid #172b38}.scope small{color:var(--muted)}.notice{padding:10px;border-radius:8px;background:rgba(66,212,255,.06);border:1px solid rgba(66,212,255,.2);color:#bfefff;line-height:1.5}.result{border:1px solid #1c3545;border-radius:9px;margin-bottom:10px;overflow:hidden}.result .head{padding:9px 10px;background:#0a1923;display:flex;justify-content:space-between;gap:10px}.result pre{margin:0;padding:11px;white-space:pre-wrap;word-break:break-word;max-height:430px;overflow:auto;background:#040b10;color:#d5e8f2;font:12px Consolas,monospace}.status{color:var(--green)}.err{color:var(--red)}label.inline{display:flex;gap:7px;align-items:center;color:var(--muted);margin:7px 0 12px}label.inline input{width:auto;margin:0}@media(max-width:850px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="brand"><span>H4G</span> // AUTHORIZED WEB LAB</div><div><a href="/">Modules</a> · <a href="/workbench">Artifact Workbench</a></div></header>
+<main>
+<div class="notice">Use only against CTF/lab targets you are authorized to test. RFC1918/private IPs and localhost are accepted automatically. Public hosts must be explicitly added to scope first. This lab is a request inspector, not an automatic exploit or brute-force engine.</div>
+<div class="grid">
+<div>
+<div class="card"><h2>Authorized Scope</h2><div class="inside"><input id="scopeHost" placeholder="example.ctf.local or 172.16.101.205"><button id="addScope">Authorize Host</button><div id="scopeList"></div></div></div>
+<div class="card"><h2>Request Builder</h2><div class="inside">
+<label>URL</label><input id="url" value="http://172.16.101.205/" placeholder="http://target/path">
+<div class="row"><div><label>Method</label><select id="method"><option>GET</option><option>POST</option><option>HEAD</option><option>OPTIONS</option></select></div></div>
+<label>POST body / raw request body</label><textarea id="body" placeholder="username=test&password=test"></textarea>
+<label class="inline"><input id="redirects" type="checkbox"> Follow redirects while staying inside authorized scope</label>
+<button id="send" class="primary">Send Request</button>
+</div></div>
+</div>
+<div>
+<div class="card"><h2>Response / Redirect Chain</h2><div id="results" class="inside"><div style="color:var(--muted)">No request sent yet.</div></div></div>
+</div>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+async function api(url,opt={}){const r=await fetch(url,opt);if(!r.ok)throw new Error(await r.text());return r.json()}
+async function loadScope(){const x=await api('/api/web/scope');let html='<div class="scope"><strong>Private ranges</strong><br><small>RFC1918 + localhost automatically allowed</small></div>';for(const h of x.configured)html+=`<div class="scope"><strong>${esc(h)}</strong><br><small>configured</small></div>`;for(const h of x.dynamic)html+=`<div class="scope"><strong>${esc(h.host)}</strong><br><small>explicitly authorized</small></div>`;$('scopeList').innerHTML=html}
+$('addScope').onclick=async()=>{const host=$('scopeHost').value.trim();if(!host)return;try{await api('/api/web/scope',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({host})});$('scopeHost').value='';await loadScope()}catch(e){alert(e.message)}};
+$('send').onclick=async()=>{const b=$('send');b.disabled=true;b.textContent='Sending…';$('results').innerHTML='<div style="color:var(--muted)">Request in progress…</div>';try{const x=await api('/api/web/fetch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:$('url').value.trim(),method:$('method').value,body:$('body').value,follow_redirects:$('redirects').checked})});$('results').innerHTML=x.history.map((r,i)=>`<div class="result"><div class="head"><div><strong>${i+1}. ${esc(r.status)} ${esc(r.url)}</strong><br><small>${esc(r.elapsed_ms)} ms</small></div><div class="status">${r.flags?.length?`🚩 ${r.flags.length}`:'✓'}</div></div><pre>HEADERS\n${esc(JSON.stringify(r.headers,null,2))}\n\n${r.flags?.length?'FLAG CANDIDATES\n'+esc(r.flags.join('\n'))+'\n\n':''}BODY\n${esc(r.body)}</pre></div>`).join('')||'<div>No response.</div>'}catch(e){$('results').innerHTML=`<div class="err">${esc(e.message)}</div>`}finally{b.disabled=false;b.textContent='Send Request'}};
+loadScope();
+</script>
+</body>
+</html>
