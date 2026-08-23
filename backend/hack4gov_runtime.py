@@ -11,6 +11,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from backend import hack4gov_pack as pack
 from backend import main as core
+# Import after hack4gov_pack so this extends the fully patched workbench catalog.
+from backend import deep_binary as deep_binary  # noqa: F401
 from backend.autonomous_solver_router import router as solve_router
 
 
@@ -125,7 +127,7 @@ prune_binary_flag_noise()
 
 app = FastAPI(
     title="H4G CTF Workbench - Hack4Gov Runtime",
-    version="0.6.0",
+    version="0.7.0",
     description="Runtime wrapper for the challenge-pack-aware Hack4Gov CTF workbench.",
 )
 app.include_router(solve_router)
@@ -139,11 +141,12 @@ def runtime_coverage():
         [
             "Solve Assistant with saved how-it-was-solved reports",
             "bounded autonomous analyzer execution across the challenge artifact tree",
+            "automatic PyInstaller extraction and cross-version Python bytecode disassembly",
             "enhanced solve-first reasoning with backend-only configuration",
             "strict printable flag filtering and legacy false-positive cleanup",
         ]
     )
-    return {**base, "version": "0.6.0", "features": features}
+    return {**base, "version": "0.7.0", "features": features}
 
 
 @app.get("/workbench", response_class=HTMLResponse)
@@ -175,14 +178,15 @@ def case_search_page():
 def hack4gov_tools():
     tools = list(pack.base.expanded_tools())
     names = {x.get("name") for x in tools}
-    if "zbarimg" not in names:
-        tools.append(
-            {
-                "name": "zbarimg",
-                "available": shutil.which("zbarimg") is not None,
-                "path": shutil.which("zbarimg"),
-            }
-        )
+    for name in ("zbarimg", "pyinstxtractor-ng", "pydisasm"):
+        if name not in names:
+            tools.append(
+                {
+                    "name": name,
+                    "available": shutil.which(name) is not None,
+                    "path": shutil.which(name),
+                }
+            )
     return tools
 
 
