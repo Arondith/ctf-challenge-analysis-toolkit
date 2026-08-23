@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -10,6 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from backend import hack4gov_pack as pack
 from backend import main as core
+from backend.solve_assistant import router as solve_router
 
 
 def full_tshark_fields() -> set[str]:
@@ -46,16 +48,70 @@ def full_tshark_fields() -> set[str]:
     return fields
 
 
-# The packet analyzers in hack4gov_pack resolve this module global at request
-# time, so patch it with the uncapped field registry implementation.
+def strict_detect_flags(data: bytes):
+    """Prefer real printable CTF flags and avoid compressed-binary brace noise.
+
+    The original generic detector decoded arbitrary bytes as Latin-1. Compressed
+    PNG/WAV-derived data can therefore accidentally look like `abc{...}` even
+    though it contains control/high-bit characters. Known H4G/CTF/FLAG formats
+    are still detected, but candidates must be printable ASCII. Generic matches
+    are only searched in actual printable strings and receive lower confidence.
+    """
+    printable_stream = "\n".join(core.strings(data, 4))
+    views = [printable_stream]
+    if core.printable_ratio(data) >= 0.65:
+        views.insert(0, data.decode("utf-8", errors="ignore"))
+    if data.count(b"\x00") > len(data) // 8:
+        views.extend(
+            [
+                data.decode("utf-16le", errors="ignore"),
+                data.decode("utf-16be", errors="ignore"),
+            ]
+        )
+
+    results: dict[str, float] = {}
+
+    def acceptable(value: str, generic: bool = False) -> bool:
+        if not value.isascii() or not value.isprintable():
+            return False
+        if "{" not in value or not value.endswith("}"):
+            return False
+        body = value.split("{", 1)[1][:-1]
+        if len(body) < (5 if generic else 3):
+            return False
+        if not any(ch.isalnum() for ch in body):
+            return False
+        if generic:
+            useful = sum(ch.isalnum() or ch in "_-@!$%+." for ch in body)
+            if useful / max(1, len(body)) < 0.65:
+                return False
+        return True
+
+    for text in views:
+        for pattern in core.FLAG_PATTERNS:
+            for match in pattern.finditer(text):
+                value = match.group(0)
+                if acceptable(value):
+                    results[value] = 0.99
+        for match in core.GENERIC_FLAG.finditer(text):
+            value = match.group(0)
+            if acceptable(value, generic=True):
+                results.setdefault(value, 0.55)
+
+    return sorted(results.items(), key=lambda x: x[1], reverse=True)
+
+
+# Runtime patches used by every mounted analyzer route.
 pack.tshark_fields = full_tshark_fields
+core.detect_flags = strict_detect_flags
 
 
 app = FastAPI(
     title="H4G CTF Workbench - Hack4Gov Runtime",
-    version="0.4.3",
+    version="0.5.0",
     description="Runtime wrapper for the challenge-pack-aware Hack4Gov CTF workbench.",
 )
+app.include_router(solve_router)
 
 
 @app.get("/workbench", response_class=HTMLResponse)
@@ -69,6 +125,7 @@ def expanded_workbench():
     needle = '<button id="newChallenge" class="danger">New Challenge</button>'
     replacement = (
         '<a href="/challenge-library"><button>Challenge Library</button></a>'
+        '<a href="/solve-assistant"><button>Solve Assistant</button></a>'
         '<a href="/case-search"><button>Case Search</button></a>'
         '<a href="/visual-crypto"><button>Visual Crypto</button></a>'
         + needle
