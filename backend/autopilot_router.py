@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+import json
+import os
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -20,6 +23,8 @@ from backend.autopilot_engine import (
 from backend.challenge_context import infer_challenge_context
 
 router = APIRouter()
+MAX_BUNDLE_BYTES = int(os.getenv("CTF_AUTOPILOT_BUNDLE_MAX", str(512 * 1024 * 1024)))
+MAX_BUNDLE_FILES = int(os.getenv("CTF_AUTOPILOT_BUNDLE_FILES", "500"))
 
 
 class StartRequest(BaseModel):
@@ -41,8 +46,22 @@ def _resolve_root(requested: str | None) -> str:
     return root
 
 
+async def _read_upload(upload: UploadFile) -> bytes:
+    data = bytearray()
+    while True:
+        chunk = await upload.read(1024 * 1024)
+        if not chunk:
+            break
+        data.extend(chunk)
+        if len(data) > core.MAX_UPLOAD:
+            raise HTTPException(413, f"{upload.filename or 'file'} exceeds the per-file upload limit.")
+    if not data:
+        raise HTTPException(400, f"{upload.filename or 'file'} is empty.")
+    return bytes(data)
+
+
 async def _reason_about_case(snapshot: dict, mode: str) -> dict:
-    root_id, evidence = reasoning.collect_evidence(snapshot["root_artifact_id"])
+    _, evidence = reasoning.collect_evidence(snapshot["root_artifact_id"])
     timeline = "\n".join(
         f"- {item['message']}" for item in snapshot.get("timeline", [])[-20:]
     )
@@ -132,7 +151,65 @@ def autopilot_status():
         "strategy_reset": True,
         "anti_loop_memory": True,
         "internal_fallback_parsers": True,
+        "multi_file_cases": True,
         "enhanced_reasoning": bool(reasoning.OPENAI_API_KEY),
+    }
+
+
+@router.post("/api/autopilot/upload")
+async def upload_bundle(files: list[UploadFile] = File(...)):
+    if not files:
+        raise HTTPException(400, "No challenge files supplied.")
+    if len(files) > MAX_BUNDLE_FILES:
+        raise HTTPException(413, f"Challenge bundle exceeds {MAX_BUNDLE_FILES} files.")
+
+    loaded: list[tuple[str, bytes]] = []
+    total = 0
+    for upload in files:
+        data = await _read_upload(upload)
+        total += len(data)
+        if total > MAX_BUNDLE_BYTES:
+            raise HTTPException(413, "Challenge bundle exceeds the configured total upload limit.")
+        loaded.append((upload.filename or "artifact.bin", data))
+
+    with core.db() as conn:
+        pipeline = core.Pipeline(conn)
+        if len(loaded) == 1:
+            name, data = loaded[0]
+            root_id = pipeline.process(data, core.safe_filename(name), origin="upload", technique="CTF Autopilot upload")
+            imported = [root_id]
+        else:
+            manifest = {
+                "case_type": "CTF Autopilot multi-file challenge",
+                "file_count": len(loaded),
+                "total_bytes": total,
+                "files": [{"name": name, "size": len(data)} for name, data in loaded],
+            }
+            root_id = pipeline.process(
+                json.dumps(manifest, indent=2).encode("utf-8"),
+                "autopilot_case_manifest.json",
+                origin="upload",
+                technique="CTF Autopilot challenge bundle",
+            )
+            imported = [root_id]
+            for name, data in loaded:
+                child = pipeline.process(
+                    data,
+                    core.safe_filename(name),
+                    parent=root_id,
+                    origin="upload",
+                    technique=f"Challenge bundle member: {name}",
+                    depth=1,
+                )
+                imported.append(child)
+        conn.commit()
+
+    await core.hub.broadcast({"event": "autopilot-upload", "artifact_id": root_id})
+    return {
+        "root_artifact_id": root_id,
+        "artifacts": imported,
+        "files": len(loaded),
+        "total_bytes": total,
     }
 
 
