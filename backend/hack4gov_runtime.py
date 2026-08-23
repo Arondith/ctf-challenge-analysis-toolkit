@@ -49,14 +49,7 @@ def full_tshark_fields() -> set[str]:
 
 
 def strict_detect_flags(data: bytes):
-    """Prefer real printable CTF flags and avoid compressed-binary brace noise.
-
-    The original generic detector decoded arbitrary bytes as Latin-1. Compressed
-    PNG/WAV-derived data can therefore accidentally look like `abc{...}` even
-    though it contains control/high-bit characters. Known H4G/CTF/FLAG formats
-    are still detected, but candidates must be printable ASCII. Generic matches
-    are only searched in actual printable strings and receive lower confidence.
-    """
+    """Prefer real printable CTF flags and avoid compressed-binary brace noise."""
     printable_stream = "\n".join(core.strings(data, 4))
     views = [printable_stream]
     if core.printable_ratio(data) >= 0.65:
@@ -101,9 +94,28 @@ def strict_detect_flags(data: bytes):
     return sorted(results.items(), key=lambda x: x[1], reverse=True)
 
 
+def prune_binary_flag_noise() -> int:
+    """Remove previously stored candidates that fail the stricter detector."""
+    removed = 0
+    with core.db() as conn:
+        rows = conn.execute("SELECT id, flag, status FROM flags").fetchall()
+        for row in rows:
+            if row["status"] == "confirmed":
+                continue
+            flag = row["flag"] or ""
+            valid = bool(strict_detect_flags(flag.encode("utf-8", errors="ignore")))
+            if not valid:
+                conn.execute("DELETE FROM flags WHERE id=?", (row["id"],))
+                removed += 1
+        if removed:
+            core.add_event(conn, None, "Flag candidate cleanup", f"Removed {removed} binary/noisy regex false positives")
+    return removed
+
+
 # Runtime patches used by every mounted analyzer route.
 pack.tshark_fields = full_tshark_fields
 core.detect_flags = strict_detect_flags
+prune_binary_flag_noise()
 
 
 app = FastAPI(
@@ -112,6 +124,20 @@ app = FastAPI(
     description="Runtime wrapper for the challenge-pack-aware Hack4Gov CTF workbench.",
 )
 app.include_router(solve_router)
+
+
+@app.get("/api/h4g/coverage")
+def runtime_coverage():
+    base = pack.h4g_coverage()
+    features = list(base.get("features", []))
+    features.extend(
+        [
+            "Solve Assistant with saved how-it-was-solved reports",
+            "optional OpenAI reasoning mode with backend-only API key",
+            "strict printable flag filtering and legacy false-positive cleanup",
+        ]
+    )
+    return {**base, "version": "0.5.0", "features": features}
 
 
 @app.get("/workbench", response_class=HTMLResponse)
