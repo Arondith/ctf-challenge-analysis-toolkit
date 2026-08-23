@@ -1,11 +1,22 @@
-H4G CTF Challenge Analysis Toolkit
-==================================
+H4G CTF Challenge Analysis Workbench
+====================================
 
 IMPORTANT
 ---------
 The full Analysis Tools list (file, strings, xxd, exiftool, binwalk,
 foremost, tshark, radare2, rabin2, readelf, objdump, nm, zsteg,
 steghide, and upx) is installed inside the Docker image.
+
+The integrated workbench now runs those tools from the browser. You should not
+need to leave the application and copy normal analysis commands into PowerShell.
+
+For uploaded PCAPs the workbench can automatically run protocol statistics,
+endpoints, TCP conversations, DNS/HTTP inspection, payload checks, TCP-stream
+reassembly/flag scanning, and transferred-object extraction. Recovered objects
+are sent back into the same recursive artifact-analysis pipeline.
+
+The built-in demo is separated from real challenge flags, and uploading a real
+artifact automatically removes demo evidence first.
 
 If you run the backend directly from a Windows Python virtual environment,
 most Linux forensic utilities will appear as "missing" because they are not
@@ -21,19 +32,28 @@ RECOMMENDED: RUN WITH DOCKER DESKTOP
 
 cd "C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit"
 
-3. Build the analyzer image with all CTF tools:
+3. Pull the latest changes if needed:
+
+git pull
+
+4. Build the analyzer image with all CTF tools:
 
 docker compose build --no-cache
 
-4. Start the application:
+5. Start the application:
 
 docker compose up
 
-5. Open this in your browser:
+6. Open this in your browser:
 
 http://127.0.0.1:8000
 
-The Analysis Tools card should now detect the installed commands.
+Use "Upload + Analyze" or drag a challenge file into the page. The workbench
+will triage the file and run the relevant allow-listed tools inside Docker.
+
+Use "Analyze Entire Challenge" to run relevant analysis across the current
+artifact tree. "Deep file carving (Foremost)" remains a manual action because
+it can create many recovered files.
 
 To stop the application, press:
 
@@ -77,9 +97,9 @@ Then install the Python requirements:
 
 .\.venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
 
-Then start the server:
+Then start the integrated server:
 
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn backend.workbench:app --host 127.0.0.1 --port 8000
 
 Open:
 
