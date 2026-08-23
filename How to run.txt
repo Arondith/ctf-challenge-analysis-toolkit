@@ -1,108 +1,95 @@
 H4G CTF Challenge Analysis Workbench
 ====================================
 
-IMPORTANT
----------
-The full Analysis Tools list (file, strings, xxd, exiftool, binwalk,
-foremost, tshark, radare2, rabin2, readelf, objdump, nm, zsteg,
-steghide, and upx) is installed inside the Docker image.
+The Docker build contains the integrated forensic/reverse-engineering toolchain
+and the Hack4Gov-style challenge-pack extensions.
 
-The integrated workbench now runs those tools from the browser. You should not
-need to leave the application and copy normal analysis commands into PowerShell.
+MAIN MODULES
+------------
+http://127.0.0.1:8000/
+    Module home.
 
-For uploaded PCAPs the workbench can automatically run protocol statistics,
-endpoints, TCP conversations, DNS/HTTP inspection, payload checks, TCP-stream
-reassembly/flag scanning, and transferred-object extraction. Recovered objects
-are sent back into the same recursive artifact-analysis pipeline.
+http://127.0.0.1:8000/workbench
+    Artifact Workbench: files, PCAPs, WAV/audio, images, PDF, email, archives,
+    binaries, steganography, USB HID/keylogger captures, recursive extraction,
+    flag detection, decoder lab, and evidence timeline.
 
-The built-in demo is separated from real challenge flags, and uploading a real
-artifact automatically removes demo evidence first.
-
-If you run the backend directly from a Windows Python virtual environment,
-most Linux forensic utilities will appear as "missing" because they are not
-installed on Windows or are not on your Windows PATH.
+http://127.0.0.1:8000/web-lab
+    Authorized Web Lab: scoped GET/POST/HEAD/OPTIONS requests, headers, body,
+    response time, flags, and redirect-chain inspection. localhost and RFC1918
+    private IP ranges are allowed automatically. Public hosts must be explicitly
+    added to the authorized scope in the Web Lab before requests are sent.
 
 
-RECOMMENDED: RUN WITH DOCKER DESKTOP
-------------------------------------
+RUN WITH DOCKER DESKTOP
+-----------------------
 
-1. Install and start Docker Desktop for Windows.
+1. Start Docker Desktop.
 
-2. Open PowerShell and go to the project folder:
+2. Open PowerShell:
 
 cd "C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit"
 
-3. Pull the latest changes if needed:
+3. Use the integrated-workbench branch while testing the pull request:
 
-git pull
+git checkout feature/integrated-workbench
+git pull origin feature/integrated-workbench
 
-4. Build the analyzer image with all CTF tools:
+4. Rebuild because the Docker image contains the analysis tools:
 
+docker compose down
 docker compose build --no-cache
 
-5. Start the application:
+5. Start:
 
 docker compose up
 
-6. Open this in your browser:
+6. Open:
 
 http://127.0.0.1:8000
 
-Use "Upload + Analyze" or drag a challenge file into the page. The workbench
-will triage the file and run the relevant allow-listed tools inside Docker.
-
-Use "Analyze Entire Challenge" to run relevant analysis across the current
-artifact tree. "Deep file carving (Foremost)" remains a manual action because
-it can create many recovered files.
-
-To stop the application, press:
-
-Ctrl + C
-
-Or from another PowerShell window run:
+To stop, press Ctrl+C or run:
 
 docker compose down
 
 
-AFTER PULLING NEW GITHUB CHANGES
---------------------------------
+ANALYSIS TOOLCHAIN
+------------------
 
-When the Dockerfile changes, rebuild the image before starting it again:
+file, strings, xxd, exiftool, binwalk, foremost, tshark, radare2, rabin2,
+readelf, objdump, nm, zsteg, steghide, upx, ffmpeg, ffprobe, sox, pdfinfo,
+pdftotext, pdfimages, and bsdtar.
 
-git pull
-docker compose down
-docker compose build --no-cache
-docker compose up
+The workbench also contains Python analysis modules for Base64/Base32/hex/URL
+and XOR decoding, whitespace steganography, GPS coordinate distance analysis,
+email header extraction, damaged-header/signature scans, and USB HID decoding.
 
 
-OPTIONAL: NATIVE WINDOWS / PYTHON MODE
---------------------------------------
+CHALLENGE WORKFLOW
+------------------
 
-You can still run the web application without Docker, but the external Linux
-forensics/reverse-engineering tools may show as missing.
+For a file/PCAP/audio/document challenge:
 
-From this folder:
+1. Open Artifact Workbench.
+2. Upload the original challenge artifact.
+3. Allow Upload + Analyze to triage it.
+4. Use Analyze Entire Challenge to process recovered child artifacts.
+5. Inspect Tool Output, Preview / Hex, Decoder Lab, artifact graph, and flag
+   candidates without leaving the app.
 
-C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit
+For a web challenge:
 
-run:
+1. Open Authorized Web Lab.
+2. Private CTF IPs such as 172.16.x.x are already within local/private scope.
+3. For a public CTF host, explicitly add the hostname to Authorized Scope.
+4. Enter the URL and inspect responses/redirects. The Web Lab does not provide
+   automatic exploitation, credential stuffing, or brute-force attacks.
 
-python -m venv .venv
 
-Then:
+WORKSPACE RECOVERY
+------------------
 
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-
-Then install the Python requirements:
-
-.\.venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
-
-Then start the integrated server:
-
-.\.venv\Scripts\python.exe -m uvicorn backend.workbench:app --host 127.0.0.1 --port 8000
-
-Open:
-
-http://127.0.0.1:8000
-
-For the complete analysis toolchain, use the Docker method above.
+The workspace database persists through Docker restarts. At startup, the app
+repairs valid moved artifact paths and removes stale database trees whose files
+no longer exist. Re-uploading a stale artifact rebuilds its backing file and
+analysis tree automatically.
