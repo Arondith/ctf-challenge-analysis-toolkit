@@ -7,10 +7,9 @@ ENV CTF_CONFIG=/app/config/config.yaml
 
 ARG RADARE2_VERSION=6.1.8
 
-# Install the external analysis utilities shown by /api/tools.
+# Install the external analysis utilities used by the integrated workbench.
 # binutils provides: strings, readelf, objdump, and nm.
-# upx-ucl installs /usr/bin/upx-ucl, so a compatibility symlink is
-# created below because the application checks for the command `upx`.
+# upx-ucl installs /usr/bin/upx-ucl, so a compatibility symlink is created.
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
        file \
@@ -23,6 +22,10 @@ RUN apt-get update \
        tshark \
        steghide \
        upx-ucl \
+       ffmpeg \
+       sox \
+       poppler-utils \
+       libarchive-tools \
        ruby \
        ruby-dev \
        git \
@@ -43,13 +46,12 @@ RUN git clone --depth 1 --branch "${RADARE2_VERSION}" \
     && make install \
     && rm -rf /tmp/radare2
 
-# Fail the image build immediately if one of the tools expected by the UI
-# is unavailable. This prevents the Analysis Tools card from silently
-# showing missing tools after a successful Docker build.
+# Fail the image build immediately if an expected analysis utility is missing.
 RUN set -eux; \
     for tool in \
         file strings xxd exiftool binwalk foremost tshark \
-        radare2 rabin2 readelf objdump nm zsteg steghide upx; \
+        radare2 rabin2 readelf objdump nm zsteg steghide upx \
+        ffmpeg ffprobe sox pdfinfo pdftotext pdfimages bsdtar; \
     do \
         command -v "$tool" >/dev/null; \
     done
@@ -67,4 +69,4 @@ RUN mkdir -p /workspace/artifacts
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.recovery:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.challenge_pack:app", "--host", "0.0.0.0", "--port", "8000"]
