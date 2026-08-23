@@ -27,10 +27,10 @@ def _tree_ids(conn, root_id: str) -> list[str]:
     return [row["id"] for row in rows]
 
 
-def _already_attempted(conn, artifact_id: str, analysis_id: str) -> bool:
-    row = conn.execute(
+def _previous_run(conn, artifact_id: str, analysis_id: str):
+    return conn.execute(
         """
-        SELECT id
+        SELECT id, status, returncode
         FROM tool_runs
         WHERE artifact_id=? AND analysis_id=?
         ORDER BY id DESC
@@ -38,18 +38,28 @@ def _already_attempted(conn, artifact_id: str, analysis_id: str) -> bool:
         """,
         (artifact_id, analysis_id),
     ).fetchone()
-    return bool(row)
+
+
+def _is_reusable(previous) -> bool:
+    if not previous:
+        return False
+    # A completed run is evidence and should not be needlessly rerun every time
+    # the Solve button is pressed. Missing/error/timeout runs are retried so a
+    # newly rebuilt image or newly installed tool can recover automatically.
+    return previous["status"] == "complete"
 
 
 async def run_autonomous_analysis(root_id: str) -> dict:
     """Run bounded, allow-listed automatic analyzers across a challenge tree.
 
-    The workbench's analysis_catalog/execute_analysis functions are patched by the
-    challenge-pack modules at runtime, so this automatically uses the most capable
-    registered analyzers without exposing arbitrary shell execution.
+    Completed historical analysis is reused as evidence. New analyzers and prior
+    missing/error/timeout analyses are executed. Newly produced child artifacts
+    enter the next pass automatically.
     """
 
     actions = 0
+    reused = 0
+    retrying = 0
     artifacts_seen: set[str] = set()
     results: list[dict] = []
     stopped_reason = "no-new-actions"
@@ -60,6 +70,8 @@ async def run_autonomous_analysis(root_id: str) -> dict:
             return {
                 "root_artifact_id": root_id,
                 "actions": 0,
+                "reused_actions": 0,
+                "retried_actions": 0,
                 "artifacts_seen": 0,
                 "passes": 0,
                 "stopped_reason": "root-not-found",
@@ -100,8 +112,13 @@ async def run_autonomous_analysis(root_id: str) -> dict:
                         break
                     if not spec.get("auto"):
                         continue
-                    if _already_attempted(conn, artifact_id, analysis_id):
+
+                    previous = _previous_run(conn, artifact_id, analysis_id)
+                    if _is_reusable(previous):
+                        reused += 1
                         continue
+                    if previous:
+                        retrying += 1
 
                     try:
                         result = await wb.execute_analysis(conn, row, analysis_id)
@@ -126,7 +143,7 @@ async def run_autonomous_analysis(root_id: str) -> dict:
             # Re-query on the next pass so newly extracted/repaired/generated
             # children automatically enter the same solve session.
             if pass_actions == 0:
-                stopped_reason = "no-new-actions"
+                stopped_reason = "all-current-analysis-reused" if reused else "no-new-actions"
                 break
             stopped_reason = "pass-limit"
 
@@ -134,7 +151,10 @@ async def run_autonomous_analysis(root_id: str) -> dict:
             conn,
             root_id,
             "Autonomous analysis pass",
-            f"{actions} analyzer action(s), {len(artifacts_seen)} artifact(s), stopped={stopped_reason}",
+            (
+                f"{actions} new analyzer action(s), {reused} completed action(s) reused, "
+                f"{retrying} retried, {len(artifacts_seen)} artifact(s), stopped={stopped_reason}"
+            ),
         )
         conn.commit()
 
@@ -154,6 +174,8 @@ async def run_autonomous_analysis(root_id: str) -> dict:
     return {
         "root_artifact_id": root_id,
         "actions": actions,
+        "reused_actions": reused,
+        "retried_actions": retrying,
         "artifacts_seen": len(artifacts_seen),
         "passes": completed_passes,
         "stopped_reason": stopped_reason,
