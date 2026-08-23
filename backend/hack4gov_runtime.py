@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from backend import hack4gov_pack as pack
 from backend import main as core
-from backend.solver_prompt_patch import router as solve_router
+from backend.autonomous_solver_router import router as solve_router
 
 
 def full_tshark_fields() -> set[str]:
@@ -125,7 +125,7 @@ prune_binary_flag_noise()
 
 app = FastAPI(
     title="H4G CTF Workbench - Hack4Gov Runtime",
-    version="0.5.1",
+    version="0.6.0",
     description="Runtime wrapper for the challenge-pack-aware Hack4Gov CTF workbench.",
 )
 app.include_router(solve_router)
@@ -138,11 +138,12 @@ def runtime_coverage():
     features.extend(
         [
             "Solve Assistant with saved how-it-was-solved reports",
+            "bounded autonomous analyzer execution across the challenge artifact tree",
             "enhanced solve-first reasoning with backend-only configuration",
             "strict printable flag filtering and legacy false-positive cleanup",
         ]
     )
-    return {**base, "version": "0.5.1", "features": features}
+    return {**base, "version": "0.6.0", "features": features}
 
 
 @app.get("/workbench", response_class=HTMLResponse)
