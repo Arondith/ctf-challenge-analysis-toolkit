@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -9,9 +12,48 @@ from backend import hack4gov_pack as pack
 from backend import main as core
 
 
+def full_tshark_fields() -> set[str]:
+    """Read tshark's field registry without the UI output truncation limit."""
+    tool = shutil.which("tshark")
+    if not tool:
+        return set()
+    env = {
+        "PATH": os.environ.get("PATH", ""),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "HOME": "/tmp",
+    }
+    try:
+        completed = subprocess.run(
+            [tool, "-G", "fields"],
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        return set()
+    if completed.returncode != 0:
+        return set()
+    text = completed.stdout.decode("utf-8", errors="replace")
+    fields: set[str] = set()
+    for line in text.splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 3 and parts[0] == "F":
+            fields.add(parts[2])
+    return fields
+
+
+# The packet analyzers in hack4gov_pack resolve this module global at request
+# time, so patch it with the uncapped field registry implementation.
+pack.tshark_fields = full_tshark_fields
+
+
 app = FastAPI(
     title="H4G CTF Workbench - Hack4Gov Runtime",
-    version="0.4.2",
+    version="0.4.3",
     description="Runtime wrapper for the challenge-pack-aware Hack4Gov CTF workbench.",
 )
 
@@ -38,6 +80,15 @@ def expanded_workbench():
 @app.get("/case-search")
 def case_search_page():
     return FileResponse(core.ROOT / "frontend" / "case_search.html")
+
+
+@app.get("/api/tools")
+def hack4gov_tools():
+    tools = list(pack.base.expanded_tools())
+    names = {x.get("name") for x in tools}
+    if "zbarimg" not in names:
+        tools.append({"name": "zbarimg", "available": shutil.which("zbarimg") is not None, "path": shutil.which("zbarimg")})
+    return tools
 
 
 def tree_artifact_rows(root_artifact: str | None):
