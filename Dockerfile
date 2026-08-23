@@ -26,6 +26,7 @@ RUN apt-get update \
        sox \
        poppler-utils \
        libarchive-tools \
+       zbar-tools \
        ruby \
        ruby-dev \
        git \
@@ -51,7 +52,7 @@ RUN set -eux; \
     for tool in \
         file strings xxd exiftool binwalk foremost tshark \
         radare2 rabin2 readelf objdump nm zsteg steghide upx \
-        ffmpeg ffprobe sox pdfinfo pdftotext pdfimages bsdtar; \
+        ffmpeg ffprobe sox pdfinfo pdftotext pdfimages bsdtar zbarimg; \
     do \
         command -v "$tool" >/dev/null; \
     done
@@ -69,4 +70,4 @@ RUN mkdir -p /workspace/artifacts
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.challenge_pack:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.hack4gov_pack:app", "--host", "0.0.0.0", "--port", "8000"]
