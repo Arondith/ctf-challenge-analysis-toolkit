@@ -11,9 +11,10 @@ from backend import main as core
 from backend import solve_assistant as reasoning
 from backend import solver_prompt_patch as prompt_patch
 # Imported for side effects after the deep binary/audio registry has been installed
-# by the runtime. This adds Python/internal fallback analyzers to the same safe
-# allow-listed catalog consumed by the Case Director.
+# by the runtime. These add Python/internal fallback analyzers and then adaptive
+# fallback promotion to the same safe allow-listed catalog consumed by Case Director.
 from backend import fallback_analyzers as fallback_analyzers  # noqa: F401
+from backend import adaptive_fallbacks as adaptive_fallbacks  # noqa: F401
 from backend.autopilot_engine import (
     accept_reasoning_candidate,
     case_snapshot,
@@ -77,6 +78,61 @@ async def _load_files(files: list[UploadFile]) -> tuple[list[tuple[str, bytes]],
     return loaded, total
 
 
+def _tree_ids(conn, root_id: str) -> list[str]:
+    rows = conn.execute(
+        """
+        WITH RECURSIVE tree(id) AS (
+            SELECT ?
+            UNION
+            SELECT e.child_id FROM edges e JOIN tree t ON e.parent_id=t.id
+        )
+        SELECT id FROM tree LIMIT 400
+        """,
+        (root_id,),
+    ).fetchall()
+    return [row["id"] for row in rows]
+
+
+def _candidate_has_independent_support(case_id: int, candidate: str | None, confidence: float, reasoned: dict) -> bool:
+    """Do not let a reasoning model verify its own unsupported guess.
+
+    A candidate may close the case when it is independently present in artifact/tool
+    evidence, or when a deterministic local clue solver independently reaches the
+    same high-confidence semantic answer for a knowledge/riddle solve target.
+    """
+    if not candidate or confidence < 0.90:
+        return False
+
+    with core.db() as conn:
+        case = conn.execute("SELECT * FROM autopilot_cases WHERE id=?", (case_id,)).fetchone()
+        if not case:
+            return False
+        ids = _tree_ids(conn, case["root_artifact_id"])
+        if ids:
+            marks = ",".join("?" for _ in ids)
+            matches = conn.execute(
+                f"""
+                SELECT confidence,status FROM flags
+                WHERE artifact_id IN ({marks}) AND flag=? AND status!='false-positive'
+                ORDER BY CASE WHEN status='confirmed' THEN 1 ELSE 0 END DESC, confidence DESC
+                """,
+                [*ids, candidate],
+            ).fetchall()
+            if any(row["status"] == "confirmed" or float(row["confidence"] or 0) >= 0.75 for row in matches):
+                return True
+
+        target = conn.execute("SELECT answer_type FROM autopilot_targets WHERE case_id=?", (case_id,)).fetchone()
+        answer_type = target["answer_type"] if target else ""
+
+    # Semantic/riddle answers can be deterministically corroborated by the local
+    # clue engine. Enhanced reasoning alone cannot promote an unsupported answer.
+    local_candidate = reasoned.get("local_candidate")
+    local_confidence = float(reasoned.get("local_confidence") or 0)
+    if answer_type == "knowledge_or_osint_answer" and local_candidate == candidate and local_confidence >= 0.90:
+        return True
+    return False
+
+
 async def _reason_about_case(snapshot: dict, mode: str) -> dict:
     _, evidence = reasoning.collect_evidence(snapshot["root_artifact_id"])
     timeline = "\n".join(
@@ -108,34 +164,48 @@ async def _reason_about_case(snapshot: dict, mode: str) -> dict:
         evidence,
         None,
     )
+    local_candidate = local.get("candidate")
+    local_confidence = float(local.get("confidence") or 0)
 
     if mode == "local":
+        local["local_candidate"] = local_candidate
+        local["local_confidence"] = local_confidence
         return local
+
     if mode == "ai":
-        return await prompt_patch.solve_first_reasoning(
+        result = await prompt_patch.solve_first_reasoning(
             snapshot.get("title", ""),
             snapshot.get("description", ""),
             evidence,
             None,
         )
+        result["local_candidate"] = local_candidate
+        result["local_confidence"] = local_confidence
+        return result
+
     if reasoning.OPENAI_API_KEY:
         try:
-            return await prompt_patch.solve_first_reasoning(
+            result = await prompt_patch.solve_first_reasoning(
                 snapshot.get("title", ""),
                 snapshot.get("description", ""),
                 evidence,
                 None,
             )
+            result["local_candidate"] = local_candidate
+            result["local_confidence"] = local_confidence
+            return result
         except Exception:
-            return local
+            pass
+
+    local["local_candidate"] = local_candidate
+    local["local_confidence"] = local_confidence
     return local
 
 
 async def _advance(case_id: int, mode: str) -> dict:
-    pre_state = refresh_case_reasoning_state(case_id)
+    refresh_case_reasoning_state(case_id)
     snapshot = await run_case_tick(case_id)
-    post_state = refresh_case_reasoning_state(case_id)
-    snapshot.update(post_state)
+    snapshot.update(refresh_case_reasoning_state(case_id))
     reasoned = None
 
     # Correlation/riddle reasoning is another solver capability, not a user-facing
@@ -149,11 +219,14 @@ async def _advance(case_id: int, mode: str) -> dict:
                 "confidence": 0.0,
                 "reasoning_summary": f"Reasoning pass unavailable: {type(exc).__name__}",
                 "mode": "local",
+                "local_candidate": None,
+                "local_confidence": 0.0,
             }
 
         candidate = reasoned.get("candidate") if reasoned else None
         confidence = float(reasoned.get("confidence") or 0) if reasoned else 0.0
-        if accept_reasoning_candidate(
+        supported = _candidate_has_independent_support(case_id, candidate, confidence, reasoned or {})
+        if supported and accept_reasoning_candidate(
             case_id,
             candidate,
             confidence,
@@ -161,6 +234,9 @@ async def _advance(case_id: int, mode: str) -> dict:
         ):
             snapshot = case_snapshot(case_id)
             snapshot.update(refresh_case_reasoning_state(case_id))
+        elif candidate:
+            # Keep the candidate visible to the investigation but do not fake success.
+            reasoned["candidate_state"] = "SUPPORTED_NEEDS_INDEPENDENT_CONFIRMATION"
 
     snapshot["reasoning"] = reasoned
     return snapshot
@@ -181,10 +257,15 @@ def autopilot_status():
         "strategy_reset": True,
         "anti_loop_memory": True,
         "internal_fallback_parsers": True,
+        "adaptive_fallback_promotion": True,
+        "bounded_decode_branching": True,
+        "raw_pyinstaller_recovery": True,
+        "ocr_preprocessing_fallback": True,
         "multi_file_cases": True,
         "resumable_cases": True,
         "solve_target_tracking": True,
         "competing_hypotheses": True,
+        "independent_flag_validation": True,
         "enhanced_reasoning": bool(reasoning.OPENAI_API_KEY),
     }
 
