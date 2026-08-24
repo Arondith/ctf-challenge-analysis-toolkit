@@ -8,6 +8,7 @@ Pillow>=11.0
 numpy>=2.0
 pyinstxtractor-ng>=2025.1.6
 dpkt>=1.9.8
+scapy>=2.6.1
 pefile>=2024.8.26
 pypdf>=5.0
 PyMuPDF>=1.24
