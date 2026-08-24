@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 
 from backend import main as core
 
@@ -71,8 +70,23 @@ def _target_from_context(title: str, description: str) -> tuple[str, str | None,
         return "grid_coordinates", prefix, {"components": ["all_target_cells"]}
     if "sha256" in text or "sha-256" in text:
         return "hash_answer", prefix, {"components": ["sha256"]}
-    if any(x in text for x in ("what malware", "what is the name", "who is", "when was", "what date")):
+
+    semantic_markers = (
+        "what malware",
+        "what is the name",
+        "name of",
+        "knowing the name",
+        "who is",
+        "identify the",
+        "when was",
+        "what date",
+        "famous 2010 worm",
+        "public information",
+        "last pinged",
+    )
+    if any(x in text for x in semantic_markers):
         return "knowledge_or_osint_answer", prefix, {"components": ["semantic_answer"]}
+
     return "literal_or_derived_flag", prefix, {"components": ["verified_flag"]}
 
 
