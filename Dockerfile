@@ -27,6 +27,7 @@ RUN apt-get update \
        poppler-utils \
        libarchive-tools \
        zbar-tools \
+       tesseract-ocr \
        ruby \
        ruby-dev \
        git \
@@ -59,7 +60,7 @@ RUN set -eux; \
     for tool in \
         file strings xxd exiftool binwalk foremost tshark \
         radare2 rabin2 readelf objdump nm zsteg steghide upx \
-        ffmpeg ffprobe sox pdfinfo pdftotext pdfimages bsdtar zbarimg \
+        ffmpeg ffprobe sox pdfinfo pdftotext pdfimages bsdtar zbarimg tesseract \
         pyinstxtractor-ng pydisasm; \
     do \
         command -v "$tool" >/dev/null; \
