@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H4G Challenge Library</title>
+<style>
+:root{color-scheme:dark;--bg:#050b11;--panel:#0a151f;--border:#203746;--text:#e7f0f6;--muted:#7d96a8;--cyan:#42d4ff;--green:#3ad67d;--red:#ff6f6f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,Segoe UI,Arial,sans-serif}header{height:62px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--border);background:#07111a}.brand{font-weight:900;letter-spacing:.1em}.brand span{color:var(--cyan)}a{color:#bfefff;text-decoration:none}button,input{font:inherit}button{background:#102535;border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:8px;cursor:pointer}button:hover{border-color:var(--cyan)}button.primary{background:#073c4d;border-color:#17657b}button:disabled{opacity:.45;cursor:wait}main{max-width:1280px;margin:auto;padding:24px}.top{display:grid;grid-template-columns:1fr 360px;gap:16px}.card{background:linear-gradient(180deg,#0d1924,#08121b);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px}.card h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:11px 13px;margin:0;border-bottom:1px solid var(--border)}.inside{padding:13px}.lead{color:#b8ccd8;line-height:1.6}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}input{background:#06121b;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:9px;min-width:280px;flex:1}.status{padding:10px;border:1px solid var(--border);border-radius:8px;color:var(--muted);line-height:1.5}.ok{color:var(--green)}.err{color:var(--red)}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px;border-bottom:1px solid #152c3a;vertical-align:middle}th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.path{font-family:Consolas,monospace;word-break:break-all}.type{font-size:11px;padding:2px 7px;border-radius:10px;background:#142a39;color:#b7cddd}.type.dir{background:#2b2840;color:#d8ceff}.actions{white-space:nowrap}.empty{padding:24px;text-align:center;color:var(--muted)}pre{background:#040b10;border:1px solid #18303f;border-radius:8px;padding:10px;max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-word;color:#cfe5ef;font:12px Consolas,monospace}@media(max-width:900px){.top{grid-template-columns:1fr}table{font-size:12px}.actions{white-space:normal}}
+</style>
+</head>
+<body>
+<header><div class="brand"><span>H4G</span> // CHALLENGE LIBRARY</div><nav><a href="/">Home</a> · <a href="/workbench">Workbench</a> · <a href="/visual-crypto">Visual Crypto</a></nav></header>
+<main>
+<div class="top">
+<div>
+<h1>Bundled HACK4GOV CHALLENGES</h1>
+<p class="lead">Import the actual example artifacts that are already in this repository. Folders are imported as one challenge tree with a generated inventory manifest, so related HTML/CSS/images, leak folders, audio sets, and other multi-file challenges stay grouped together.</p>
+</div>
+<div id="status" class="status">Loading challenge library…</div>
+</div>
+<div class="card"><h2>Browse</h2><div class="inside">
+<div class="toolbar"><input id="search" placeholder="Filter by filename or folder path…"><span id="count"></span></div>
+<div style="overflow:auto"><table><thead><tr><th>Type</th><th>Path</th><th>Size</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></div>
+</div></div>
+<div class="card"><h2>Folder Inventory / Import Result</h2><div class="inside"><pre id="details">Select Inspect on a folder, or import an artifact.</pre></div></div>
+</main>
+<script>
+let roots=[],items=[],rootIndex=0,busy=false;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const fmt=n=>{n=Number(n||0);if(n<1024)return n+' B';if(n<1048576)return (n/1024).toFixed(1)+' KB';return (n/1048576).toFixed(1)+' MB'};
+async function api(url,opt={}){const r=await fetch(url,opt);const t=await r.text();if(!r.ok)throw new Error(t);try{return JSON.parse(t)}catch{return t}}
+function render(){const q=$('search').value.trim().toLowerCase();const shown=items.filter(x=>!q||x.path.toLowerCase().includes(q));$('count').textContent=`${shown.length} item(s)`;$('rows').innerHTML=shown.slice(0,1000).map(x=>`<tr><td><span class="type ${x.type==='dir'?'dir':''}">${x.type}</span></td><td class="path">${esc(x.path)}</td><td>${x.type==='file'?fmt(x.size):''}</td><td class="actions">${x.type==='dir'?`<button data-inspect="${esc(x.path)}">Inspect</button> `:''}<button class="primary" data-import="${esc(x.path)}" data-dir="${x.type==='dir'}">Import${x.type==='dir'?' Folder':''}</button></td></tr>`).join('')||'<tr><td colspan="4" class="empty">No matching items.</td></tr>';document.querySelectorAll('[data-inspect]').forEach(b=>b.onclick=()=>inspect(b.dataset.inspect));document.querySelectorAll('[data-import]').forEach(b=>b.onclick=()=>doImport(b.dataset.import,b.dataset.dir==='true',b));}
+async function load(){try{const x=await api('/api/h4g/library');roots=x.roots||[];if(!roots.length){$('status').innerHTML='<span class="err">Challenge folder not found.</span><br>Make sure Git LFS files are pulled and rebuild Docker.';items=[];render();return}rootIndex=roots[0].index;items=roots[0].items||[];$('status').innerHTML=`<span class="ok">✓ Library found</span><br>${esc(roots[0].path)}<br>${items.length} indexed item(s)`;render()}catch(e){$('status').innerHTML='<span class="err">'+esc(e.message)+'</span>'}}
+async function inspect(path){$('details').textContent='Building folder inventory…';try{const x=await api(`/api/h4g/library/inventory?root=${rootIndex}&path=${encodeURIComponent(path)}`);const files=(x.files||[]).slice().sort((a,b)=>b.size-a.size).slice(0,20);$('details').textContent=`Files: ${x.file_count}\nTotal: ${fmt(x.total_bytes)}\nSmallest: ${fmt(x.min_size)}\nLargest: ${fmt(x.max_size)}\nDuplicate groups: ${(x.duplicates||[]).length}\n\nLargest files:\n`+files.map(f=>`${fmt(f.size).padStart(10)}  ${f.path}${f.image_width?`  [${f.image_width}x${f.image_height} ${f.image_format||''}]`:''}`).join('\n')+(x.duplicates?.length?'\n\nDuplicates:\n'+x.duplicates.map(g=>g.join(' = ')).join('\n'):'')}catch(e){$('details').textContent='Error: '+e.message}}
+async function doImport(path,isDir,button){if(busy)return;busy=true;const old=button.textContent;button.disabled=true;button.textContent='Importing…';$('details').textContent='Importing challenge data into the artifact graph…';try{const x=await api('/api/h4g/library/import',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({root:rootIndex,path,recursive:isDir})});$('details').textContent=`Imported ${x.files_imported} file(s).\nRoot artifact: ${x.root_artifact_id}\nArtifacts created/linked: ${x.artifacts.length}\nLFS pointers skipped: ${(x.lfs_pointer_files_skipped||[]).length}\n\nOpen Artifact Workbench to analyze the imported challenge.`;$('status').innerHTML=`<span class="ok">✓ Import complete</span><br><a href="/workbench">Open Artifact Workbench →</a>`}catch(e){$('details').textContent='Import failed: '+e.message;$('status').innerHTML='<span class="err">Import failed.</span>'}finally{busy=false;button.disabled=false;button.textContent=old}}
+$('search').oninput=render;load();
+</script>
+</body>
+</html>

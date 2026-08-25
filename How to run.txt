@@ -1,88 +1,170 @@
-H4G CTF Challenge Analysis Toolkit
-==================================
+H4G CTF Challenge Analysis Workbench
+====================================
 
-IMPORTANT
----------
-The full Analysis Tools list (file, strings, xxd, exiftool, binwalk,
-foremost, tshark, radare2, rabin2, readelf, objdump, nm, zsteg,
-steghide, and upx) is installed inside the Docker image.
+The Docker build contains the integrated forensic/reverse-engineering toolchain,
+the Hack4Gov challenge-pack-aware extensions, and the Solve Assistant.
 
-If you run the backend directly from a Windows Python virtual environment,
-most Linux forensic utilities will appear as "missing" because they are not
-installed on Windows or are not on your Windows PATH.
+MAIN MODULES
+------------
+http://127.0.0.1:8000/
+    Hack4Gov module home.
+
+http://127.0.0.1:8000/challenge-library
+    Challenge Library: browse the bundled HACK4GOV CHALLENGES folder, inspect
+    folder inventory, and import a file/folder directly into the artifact graph.
+
+http://127.0.0.1:8000/workbench
+    Artifact Workbench: files, PCAPs, WAV/audio, images, PDF, email, archives,
+    binaries, QR/barcodes, steganography, damaged-header repair, coordinates,
+    USB HID/keylogger captures, recursive extraction, multi-protocol fragment
+    correlation, flag detection, decoder lab, and evidence timeline.
+
+http://127.0.0.1:8000/solve-assistant
+    Solve Assistant: paste the challenge wording and correlate it with the
+    current artifact tree. Local mode stays inside Docker. Optional AI mode can
+    reason over a bounded evidence summary and saves a "how it was solved"
+    report. It also distinguishes clean CTF flags from noisy binary brace matches.
+
+http://127.0.0.1:8000/case-search
+    Case Search: search across imported challenge artifacts for analyst names,
+    Message-IDs, metadata tools, timestamps, secrets, hostnames, and printable
+    strings from binary files.
+
+http://127.0.0.1:8000/visual-crypto
+    Visual Crypto Lab: combine two image artifacts using difference, multiply,
+    screen, lighter, darker, 50% blend, and XOR modes. Results return to the
+    normal artifact graph for additional analysis.
+
+http://127.0.0.1:8000/web-lab
+    Authorized Web Lab: scoped GET/POST/HEAD/OPTIONS requests, headers, body,
+    response time, flags, and redirect-chain inspection. localhost and RFC1918
+    private IP ranges are allowed automatically. Public hosts must be explicitly
+    added to the authorized scope in the Web Lab before requests are sent.
 
 
-RECOMMENDED: RUN WITH DOCKER DESKTOP
-------------------------------------
+RUN WITH DOCKER DESKTOP
+-----------------------
 
-1. Install and start Docker Desktop for Windows.
+1. Start Docker Desktop.
 
-2. Open PowerShell and go to the project folder:
+2. Open PowerShell:
 
 cd "C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit"
 
-3. Build the analyzer image with all CTF tools:
+3. Use the integrated-workbench branch:
 
+git checkout feature/integrated-workbench
+git pull origin feature/integrated-workbench
+
+4. Make sure Git LFS challenge binaries are present locally:
+
+git lfs install
+git lfs pull
+
+If the Challenge Library reports Git LFS pointer files, run git lfs pull again
+before rebuilding Docker.
+
+5. Rebuild because the Docker image contains the analysis tools and bundled
+   challenge examples:
+
+docker compose down
 docker compose build --no-cache
 
-4. Start the application:
+6. Start:
 
 docker compose up
 
-5. Open this in your browser:
+7. Open:
 
 http://127.0.0.1:8000
 
-The Analysis Tools card should now detect the installed commands.
-
-To stop the application, press:
-
-Ctrl + C
-
-Or from another PowerShell window run:
+To stop, press Ctrl+C or run:
 
 docker compose down
 
 
-AFTER PULLING NEW GITHUB CHANGES
---------------------------------
+OPTIONAL AI SOLVE MODE
+----------------------
 
-When the Dockerfile changes, rebuild the image before starting it again:
+The Solve Assistant works without AI in Local Reasoning mode.
 
-git pull
-docker compose down
-docker compose build --no-cache
+To enable AI mode for the current PowerShell session, set your API key as an
+environment variable BEFORE starting Docker. Do not put the key in GitHub or in
+the source files:
+
+$env:OPENAI_API_KEY="your-api-key-here"
 docker compose up
 
+Optional model override:
 
-OPTIONAL: NATIVE WINDOWS / PYTHON MODE
---------------------------------------
+$env:H4G_AI_MODEL="gpt-5.6"
 
-You can still run the web application without Docker, but the external Linux
-forensics/reverse-engineering tools may show as missing.
+The browser never receives the API key. The backend sends only the challenge
+prompt plus a bounded evidence summary when AI mode is selected. Local mode does
+not send challenge content outside the workbench.
 
-From this folder:
 
-C:\Users\user\OneDrive\Desktop\STUFFS\ctf-challenge-analysis-toolkit
+ANALYSIS TOOLCHAIN
+------------------
 
-run:
+file, strings, xxd, exiftool, binwalk, foremost, tshark, radare2, rabin2,
+readelf, objdump, nm, zsteg, steghide, upx, ffmpeg, ffprobe, sox, pdfinfo,
+pdftotext, pdfimages, bsdtar, and zbarimg.
 
-python -m venv .venv
+The workbench also contains Python analysis modules for Base64/Base32/hex/URL
+and XOR decoding, whitespace steganography, CSV-aware GPS coordinate analysis,
+email header extraction, damaged-header repair/signature scans, embedded HTML/
+CSS data-URI extraction, visual cryptography, case-wide evidence search, USB HID
+decoding, clue reasoning, and stricter flag-candidate filtering.
 
-Then:
 
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
+RECOMMENDED HACK4GOV WORKFLOW
+-----------------------------
 
-Then install the Python requirements:
+For one of the bundled example challenges:
 
-.\.venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt
+1. Open Challenge Library.
+2. Import the relevant file or its containing folder.
+3. Open Artifact Workbench and use Analyze Entire Challenge.
+4. Inspect Findings, Tool Output, Preview / Hex, Decoder Lab, Case Search, and
+   Flag Candidates.
+5. Open Solve Assistant and paste the COMPLETE challenge wording. This is
+   important for riddle/knowledge challenges where the prompt itself supplies
+   the decisive clue.
+6. Select Local Reasoning or AI mode and review the saved solve report.
+7. Validate the proposed flag against the required flag format before submitting.
 
-Then start the server:
+Example clue-style flow:
 
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+Challenge prompt
+  -> identify meaningful clue
+  -> compare with artifact evidence
+  -> use background knowledge only where clearly needed
+  -> reject noisy/non-printable regex candidates
+  -> format the candidate exactly as H4G{...}
+  -> save the explanation as a Solve Report
 
-Open:
+For image-share challenges, open Visual Crypto Lab and combine the relevant image
+artifacts, then analyze the generated PNG artifacts in the Workbench.
 
-http://127.0.0.1:8000
+For a web challenge, use Authorized Web Lab. Private CTF IPs such as 172.16.x.x
+are already within local/private scope. Public hosts must be explicitly added to
+Authorized Scope. The Web Lab does not provide credential stuffing or destructive
+off-scope actions.
 
-For the complete analysis toolchain, use the Docker method above.
+
+FLAG FALSE-POSITIVE CLEANUP
+---------------------------
+
+The Hack4Gov runtime now rejects generic flag candidates containing non-ASCII or
+non-printable binary data. On startup it also removes old unconfirmed candidates
+from ctf.db that fail the stricter detector. Confirmed flags are preserved.
+
+
+WORKSPACE RECOVERY
+------------------
+
+The workspace database persists through Docker restarts. At startup, the app
+repairs valid moved artifact paths and removes stale database trees whose files
+no longer exist. Re-uploading a stale artifact rebuilds its backing file and
+analysis tree automatically.

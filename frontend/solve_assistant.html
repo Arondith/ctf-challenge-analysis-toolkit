@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H4G Solve Assistant</title>
+<style>
+:root{color-scheme:dark;--bg:#050b11;--panel:#0b1721;--border:#203746;--text:#e7f0f6;--muted:#86a0b1;--cyan:#42d4ff;--green:#3ad67d;--amber:#ffc857;--red:#ff667a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 18% 0,#12354d 0,transparent 34rem),var(--bg);color:var(--text);font:15px Inter,Segoe UI,Arial,sans-serif;min-height:100vh}a{color:var(--cyan)}header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;align-items:center}.brand{font-weight:900;letter-spacing:.1em}.brand span{color:var(--cyan)}nav a{margin-left:14px;text-decoration:none;color:#b8ccd8}main{max-width:1180px;margin:auto;padding:32px 22px}.lead{color:#b8ccd8;line-height:1.6;max-width:880px}.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:18px}@media(max-width:850px){.grid{grid-template-columns:1fr}}.panel{border:1px solid var(--border);background:linear-gradient(180deg,#0d1d29,#08131c);border-radius:14px;padding:20px}.panel h2{margin-top:0}label{display:block;margin:14px 0 6px;color:#bdd0db;font-weight:700}input,textarea,select{width:100%;background:#050e15;color:var(--text);border:1px solid #294354;border-radius:9px;padding:11px;font:inherit}textarea{min-height:150px;resize:vertical}.row{display:flex;gap:10px;flex-wrap:wrap}.row>*{flex:1}button{border:1px solid #31617a;background:#0d3041;color:#eaffff;border-radius:9px;padding:11px 15px;font-weight:800;cursor:pointer}button.primary{background:#0b5d78;border-color:#1686a9}button:hover{filter:brightness(1.12)}.status{padding:10px 12px;border-radius:9px;background:#07131c;border:1px solid var(--border);color:var(--muted);margin-bottom:14px}.ok{color:var(--green)}.warn{color:var(--amber)}.answer{font-size:22px;font-weight:900;color:var(--green);word-break:break-word}.confidence{color:var(--muted);margin:7px 0 18px}.reasoning{white-space:pre-wrap;line-height:1.65;background:#061018;border:1px solid var(--border);padding:15px;border-radius:10px;min-height:180px}.actions li{margin:8px 0;color:#c8d7df}.small{font-size:12px;color:var(--muted);line-height:1.5}.recent{margin-top:18px}.session{padding:12px;border-top:1px solid var(--border)}.session:first-child{border-top:0}.pill{display:inline-block;padding:3px 7px;border-radius:12px;background:#17384a;color:#c8f1ff;font-size:11px;margin-left:6px}code{background:#061018;border:1px solid var(--border);border-radius:5px;padding:2px 5px;color:#d9f7ff}
+</style>
+</head>
+<body>
+<header><div class="brand"><span>H4G</span> // SOLVE ASSISTANT</div><nav><a href="/">Home</a><a href="/workbench">Workbench</a><a href="/challenge-library">Library</a><a href="/case-search">Case Search</a></nav></header>
+<main>
+<h1>Upload. Analyze. Solve.</h1>
+<p class="lead">Select the uploaded challenge and press <b>Analyze & Solve</b>. Title and clue text are optional: when the challenge belongs to the bundled Hack4Gov pack, the workbench will try to resolve them automatically from the challenge document. It then runs new analyzers, reuses completed evidence, follows derived artifacts, and returns the strongest defensible flag.</p>
+<div class="grid">
+<section class="panel">
+<h2>Challenge</h2>
+<div id="solverStatus" class="status">Checking solver status…</div>
+<div class="row"><div><label for="root">Uploaded challenge</label><select id="root"><option value="">Latest uploaded root artifact</option></select></div><div><label for="mode">Solver mode</label><select id="mode"><option value="auto">Standard — best available reasoning</option><option value="local">Local reasoning only</option><option value="ai">Enhanced reasoning</option></select></div></div>
+<details><summary>Optional challenge wording / candidate</summary><label for="title">Challenge title</label><input id="title" placeholder="Optional — auto-detected when possible"><label for="description">Challenge prompt / clue</label><textarea id="description" placeholder="Optional — paste the challenge description, hints and flag format if they are not available in the challenge pack."></textarea><label for="candidate">Candidate to verify</label><input id="candidate" placeholder="H4G{...}"></details>
+<div class="row" style="margin-top:18px"><button class="primary" id="solve">Analyze & Solve</button><button id="example">Load clue-style example</button></div>
+<p class="small">Completed analyses are reused instead of rerun. Missing, failed, timed-out, or newly added analyzers are retried automatically. Derived files enter the same solve session.</p>
+</section>
+<section class="panel">
+<h2>Solve Result</h2>
+<div id="candidateOut" class="answer">No flag yet.</div><div id="confidence" class="confidence"></div>
+<div id="reasoning" class="reasoning">Press Analyze & Solve.</div>
+<h3>Next validation</h3><ul id="actions" class="actions"></ul>
+<details><summary>Evidence preview</summary><pre id="evidence" class="reasoning"></pre></details>
+</section>
+</div>
+<section class="panel recent"><h2>Recent Solve Reports</h2><div id="recent">No saved reports yet.</div></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+async function jfetch(url,opt){const r=await fetch(url,opt);let x;try{x=await r.json()}catch{x={detail:await r.text()}}if(!r.ok)throw new Error(x.detail||('HTTP '+r.status));return x}
+function modeLabel(mode){if(mode==='ai')return 'Enhanced';if(mode==='local')return 'Local';return 'Standard'}
+async function loadStatus(){try{const x=await jfetch('/api/h4g/solve/status');const auto=x.autonomous_analysis?'<span class="ok">✓ Automatic analysis ready</span> · ':'';const ctx=x.automatic_context?'<span class="ok">✓ Context detection ready</span> · ':'';$('solverStatus').innerHTML=auto+ctx+(x.ai_available?'<span class="ok">✓ Enhanced reasoning ready</span>':'<span class="ok">✓ Solver ready</span>')}catch(e){$('solverStatus').textContent=e.message}}
+async function loadArtifacts(){try{const xs=await jfetch('/api/artifacts');const roots=xs.filter(x=>!x.parent_id&&x.origin!=='demo').reverse();for(const x of roots){const o=document.createElement('option');o.value=x.id;o.textContent=`${x.id} — ${x.filename}`;$('root').appendChild(o)}}catch(e){console.warn(e)}}
+function render(x){$('candidateOut').textContent=x.candidate||'No defensible flag yet.';if(x.resolved_title&&!$('title').value)$('title').value=x.resolved_title;if(x.resolved_description&&!$('description').value)$('description').value=x.resolved_description;let extra='';if(x.autonomous_analysis){const a=x.autonomous_analysis;extra=` · ${a.actions||0} new action(s) · ${a.reused_actions||0} reused · ${a.artifacts_seen||0} artifact(s)`}$('confidence').textContent=x.confidence?`Confidence: ${Math.round(x.confidence*100)}% · ${modeLabel(x.mode)}${extra}`:`${modeLabel(x.mode)}${extra}`;$('reasoning').textContent=x.reasoning_summary||'';$('actions').innerHTML='';for(const a of (x.next_actions||[])){const li=document.createElement('li');li.textContent=a;$('actions').appendChild(li)}$('evidence').textContent=x.evidence_preview||''}
+async function solve(){const body={title:$('title').value,description:$('description').value,root_artifact_id:$('root').value||null,candidate_flag:$('candidate').value||null,mode:$('mode').value};$('solve').disabled=true;$('solve').textContent='Analyzing & Solving…';$('reasoning').textContent='Running new analyzers, reusing completed evidence, and following derived artifacts…';try{const x=await jfetch('/api/h4g/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});render(x);await loadRecent()}catch(e){$('reasoning').textContent='Error: '+e.message}finally{$('solve').disabled=false;$('solve').textContent='Analyze & Solve'}}
+async function loadRecent(){try{const xs=await jfetch('/api/h4g/solve/recent');if(!xs.length){$('recent').textContent='No saved reports yet.';return}$('recent').innerHTML=xs.map(x=>`<div class="session"><b>${escapeHtml(x.title||'Untitled challenge')}</b><span class="pill">${escapeHtml(modeLabel(x.mode))}</span><br>${x.candidate?'<span class="answer" style="font-size:15px">'+escapeHtml(x.candidate)+'</span><br>':''}<span class="small">${escapeHtml(x.created_at)} · ${Math.round((x.confidence||0)*100)}% confidence</span></div>`).join('')}catch(e){$('recent').textContent=e.message}}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+$('solve').onclick=solve;$('example').onclick=()=>{$('title').value='Did you hear that?';$('description').value="It's just static… or is it?\n\nBehind the noise, the real challenge is knowing the name of the silent strike that came after a famous 2010 worm.\n\nFlag Format: H4G{flag}";$('mode').value='local'};
+loadStatus();loadArtifacts();loadRecent();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H4G Case Search</title>
+<style>
+:root{color-scheme:dark;--bg:#050b11;--panel:#0a151f;--border:#203746;--text:#e7f0f6;--muted:#7d96a8;--cyan:#42d4ff;--green:#3ad67d;--red:#ff6f6f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px Inter,Segoe UI,Arial,sans-serif}header{height:62px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--border);background:#07111a}.brand{font-weight:900;letter-spacing:.1em}.brand span{color:var(--cyan)}a{color:#bfefff;text-decoration:none}main{max-width:1100px;margin:auto;padding:28px 22px}.lead{color:#b8ccd8;line-height:1.6}.card{background:linear-gradient(180deg,#0d1924,#08121b);border:1px solid var(--border);border-radius:12px;margin-bottom:16px;overflow:hidden}.inside{padding:14px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}input,button{font:inherit}input{flex:1;min-width:260px;background:#06121b;color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px}button{background:#073c4d;border:1px solid #17657b;color:var(--text);padding:9px 13px;border-radius:8px;cursor:pointer}button:hover{border-color:var(--cyan)}.status{margin-top:10px;color:var(--muted)}.match{border:1px solid #1b3342;border-radius:9px;background:#07131c;margin-bottom:9px;padding:10px}.match strong{color:#d8eef7}.match small{display:block;color:var(--muted);margin:3px 0 8px}.snippet{font:12px Consolas,monospace;white-space:pre-wrap;word-break:break-word;background:#040b10;padding:9px;border-radius:6px}.empty{color:var(--muted);text-align:center;padding:24px}
+</style>
+</head>
+<body>
+<header><div class="brand"><span>H4G</span> // CASE SEARCH</div><nav><a href="/">Home</a> · <a href="/challenge-library">Library</a> · <a href="/workbench">Workbench</a></nav></header>
+<main>
+<h1>Search Across Challenge Evidence</h1>
+<p class="lead">Search all currently imported non-demo artifacts for names, email IDs, metadata clues, hostnames, passwords, analyst names, timestamps, malware/tool names, or any other evidence. Binary artifacts are searched through their printable strings.</p>
+<div class="card"><div class="inside"><div class="toolbar"><input id="q" placeholder="Example: Message-ID, analyst, exiftool, secret, password…"><button id="go">Search</button></div><div id="status" class="status">Ready.</div></div></div>
+<div id="results"></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+async function run(){const q=$('q').value.trim();if(q.length<2)return;$('go').disabled=true;$('status').textContent='Searching up to 300 artifacts…';try{const r=await fetch('/api/h4g/case-search?q='+encodeURIComponent(q));const t=await r.text();if(!r.ok)throw new Error(t);const x=JSON.parse(t);$('status').textContent=`Scanned ${x.artifacts_scanned} artifact(s); ${x.matches.length} match(es).`;$('results').innerHTML=x.matches.length?x.matches.map(m=>`<div class="match"><strong>${esc(m.filename)}</strong><small>${esc(m.artifact_id)} · ${esc(m.kind)} · ${esc(m.technique||'')}</small><div class="snippet">${esc(m.snippet)}</div></div>`).join(''):'<div class="empty">No matches.</div>'}catch(e){$('status').textContent='Search failed: '+e.message}finally{$('go').disabled=false}}
+$('go').onclick=run;$('q').onkeydown=e=>{if(e.key==='Enter')run()};
+</script>
+</body>
+</html>

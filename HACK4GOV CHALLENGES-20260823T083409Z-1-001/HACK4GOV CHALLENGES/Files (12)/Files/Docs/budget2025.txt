@@ -1,0 +1,9 @@
+Budget 2025 - Summary
+---------------------
+Line 1: Travel - 12,000
+Line 2: Office - 6,500
+Line 3: Contingency - 4,000
+
+Notes:
+- Figures are preliminary.
+- See spreadsheet: budget_master.xlsx (not included)
